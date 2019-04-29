@@ -1,2 +1,5 @@
 # IDEs
 .idea
+
+# dashboard
+/dashboard/node_modules
