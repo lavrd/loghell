@@ -30,6 +30,8 @@ func NewWSServer(port int) *WSServer {
 
 func (s *WSServer) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Debug().Msgf("new websocket conn %s", r.RemoteAddr)
+
 		conn, err := websocket.Accept(w, r, websocket.AcceptOptions{})
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -41,6 +43,8 @@ func (s *WSServer) Handler() http.Handler {
 }
 
 func (s *WSServer) Start() error {
+	log.Debug().Msgf("starting websocket server on port %d", s.port)
+
 	srv := http.Server{
 		Addr:    fmt.Sprintf(":%d", s.port),
 		Handler: s.Handler(),
@@ -50,6 +54,8 @@ func (s *WSServer) Start() error {
 }
 
 func (s *WSServer) Shutdown() error {
+	log.Debug().Msg("shutdown websocket server")
+
 	for _, c := range s.conns {
 		if err := c.Close(websocket.StatusNormalClosure, ReasonServerShutdown); err != nil {
 			log.Error().Err(err)

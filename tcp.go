@@ -58,6 +58,6 @@ func (s *TCPServer) Handler(conn net.Conn) {
 }
 
 func (s *TCPServer) Shutdown() error {
-	log.Debug().Msg("tcp server shutdown")
+	log.Debug().Msg("shutdown tcp server")
 	return s.listener.Close()
 }
