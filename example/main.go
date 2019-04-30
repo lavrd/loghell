@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"flag"
 	"net"
 	"os"
 	"time"
@@ -15,31 +15,32 @@ type LoghellWriter struct {
 }
 
 func (w *LoghellWriter) Write(p []byte) (int, error) {
-	n, err := w.conn.Write(p)
-	if err != nil {
-		log.Error().Err(err)
-	}
-
-	fmt.Println(n)
-
-	return len(p), nil
+	_, err := w.conn.Write(p)
+	return len(p), err
 }
 
 func main() {
+	tick := flag.Duration("t", time.Millisecond*500, "set tick duration for send logs to loghell")
+	flag.Parse()
+
 	conn, err := net.Dial("tcp", "127.0.0.1:3031")
 	if err != nil {
-		panic(err)
-		log.Fatal().Err(err)
+		log.Fatal().Err(err).Msg("cannot connect to loghell")
 	}
+	defer func() {
+		if err := conn.Close(); err != nil {
+			log.Error().Err(err).Msg("close connection with loghell error")
+		}
+	}()
 
 	log.Logger = log.
 		Output(zerolog.MultiLevelWriter(
 			&LoghellWriter{conn},
-			zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339},
+			zerolog.ConsoleWriter{Out: os.Stdout},
 		)).
 		Level(zerolog.DebugLevel)
 
-	for range time.Tick(time.Millisecond * 2500) {
-		log.Debug().Str("component", "example app").Msg("example app debug log")
+	for range time.Tick(*tick) {
+		log.Debug().Str("component", "example").Msg("example debug log")
 	}
 }

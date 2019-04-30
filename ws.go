@@ -45,12 +45,12 @@ func (s *WSServer) Handler() http.Handler {
 func (s *WSServer) Start() error {
 	log.Debug().Msgf("starting websocket server on port %d", s.port)
 
-	srv := http.Server{
+	s.srv = &http.Server{
 		Addr:    fmt.Sprintf(":%d", s.port),
 		Handler: s.Handler(),
 	}
 
-	return srv.ListenAndServe()
+	return s.srv.ListenAndServe()
 }
 
 func (s *WSServer) Shutdown() error {
