@@ -1,2 +1,2 @@
 # loghell
-Log management tool
+Pretty simple log management tool
