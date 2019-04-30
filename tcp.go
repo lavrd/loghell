@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 )
 
 const (
@@ -16,17 +16,19 @@ type TCPServer struct {
 	port     int
 	ws       *WSServer
 	listener net.Listener
+	logger   zerolog.Logger
 }
 
 func NewTCPServer(port int, ws *WSServer) *TCPServer {
 	return &TCPServer{
-		port: port,
-		ws:   ws,
+		port:   port,
+		ws:     ws,
+		logger: SubLog("tcp"),
 	}
 }
 
 func (s *TCPServer) Start() error {
-	log.Debug().Msgf("starting tcp server on port %d", s.port)
+	s.logger.Debug().Msgf("starting tcp server on port %d", s.port)
 
 	listener, err := net.Listen(TCP, fmt.Sprintf(":%d", s.port))
 	if err != nil {
@@ -41,7 +43,7 @@ func (s *TCPServer) Start() error {
 			return err
 		}
 
-		log.Debug().Msgf("new conn %s", conn.RemoteAddr().String())
+		s.logger.Debug().Msgf("new conn %s", conn.RemoteAddr().String())
 
 		go s.Handler(conn)
 	}
@@ -49,10 +51,10 @@ func (s *TCPServer) Start() error {
 
 func (s *TCPServer) Handler(conn net.Conn) {
 	defer func() {
-		log.Debug().Msgf("conn close with %s", conn.RemoteAddr().String())
+		s.logger.Debug().Msgf("conn close with %s", conn.RemoteAddr().String())
 
 		if err := conn.Close(); err != nil {
-			log.Error().Err(err)
+			s.logger.Error().Err(err)
 		}
 	}()
 
@@ -61,15 +63,16 @@ func (s *TCPServer) Handler(conn net.Conn) {
 	for scanner.Scan() {
 		err := scanner.Err()
 		if err != nil {
-			log.Error().Err(err)
+			s.logger.Error().Err(err)
 			return
 		}
 
-		log.Debug().Msgf("message from %s | %s", conn.RemoteAddr().String(), scanner.Text())
+		s.logger.Debug().Msgf("received message from %s | %s", conn.RemoteAddr().String(), scanner.Text())
+		s.ws.Send(scanner.Text())
 	}
 }
 
 func (s *TCPServer) Shutdown() error {
-	log.Debug().Msg("shutdown tcp server")
+	s.logger.Debug().Msg("shutdown tcp server")
 	return s.listener.Close()
 }

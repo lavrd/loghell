@@ -25,35 +25,37 @@ func main() {
 		log.Logger = log.Level(zerolog.DebugLevel)
 	}
 
-	log.Debug().Msg("starting loghell")
+	logger := SubLog("main")
+
+	logger.Debug().Msg("starting loghell")
 
 	wsServer := NewWSServer(*wsPort)
 	tcpServer := NewTCPServer(*tcpPort, wsServer)
 
 	go func() {
 		if err := wsServer.Start(); err != nil {
-			log.Fatal().Err(err)
+			logger.Fatal().Err(err)
 		}
 	}()
 
 	go func() {
 		if err := tcpServer.Start(); err != nil {
-			log.Fatal().Err(err)
+			logger.Fatal().Err(err)
 		}
 	}()
 
 	interrupt := make(chan os.Signal)
 	signal.Notify(interrupt, syscall.SIGKILL, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
 	<-interrupt
-	log.Debug().Msg("interrupt signal")
+	logger.Debug().Msg("interrupt signal")
 
 	if err := tcpServer.Shutdown(); err != nil {
-		log.Error().Err(err).Msg("tcp server shutdown error")
+		logger.Error().Err(err).Msg("tcp server shutdown error")
 	}
 
 	if err := wsServer.Shutdown(); err != nil {
-		log.Error().Err(err).Msg("ws server shutdown error")
+		logger.Error().Err(err).Msg("ws server shutdown error")
 	}
 
-	log.Debug().Msg("loghell shutdown")
+	logger.Debug().Msg("loghell shutdown")
 }
