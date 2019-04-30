@@ -1,39 +1,38 @@
 package main
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	rule1 = "!component@api"
-	rule2 = "!level@debug"
-	rules = fmt.Sprintf("%s,%s", rule1, rule2)
-)
-
 func TestParseRule(t *testing.T) {
-	rule, err := ParseRule(rule1)
-	require.NoError(t, err)
-	require.NotNil(t, rule)
-	require.NotNil(t, rule.atSign)
-	require.NotNil(t, rule.excMark)
+	cases := []struct {
+		name string
+		rule string
+		err  error
+	}{
+		{
+			name: "correct rule",
+			rule: "!component@api",
+			err:  nil,
+		},
+	}
 
-	rule, err = ParseRule(rule2)
-	require.NoError(t, err)
-	require.NotNil(t, rule)
-	require.NotNil(t, rule.atSign)
-	require.NotNil(t, rule.excMark)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			rule, err := ParseRule(c.rule)
+			require.Equal(t, c.err, err)
+			require.NotNil(t, rule)
+			t.Logf("%+v\n", rule)
+		})
+	}
 }
 
-func TestParseRules(t *testing.T) {
-	rules, err := ParseRules(rules)
+func TestExecRule(t *testing.T) {
+	rule, err := ParseRule("!level@api")
 	require.NoError(t, err)
+	require.NotNil(t, rule)
 
-	for _, r := range rules {
-		require.NotNil(t, r)
-		require.NotNil(t, r.atSign)
-		require.NotNil(t, r.excMark)
-	}
+	ExecRule(rule, "{\"level\":\"debug\",\"component\":\"api\",\"time\":\"2019-04-30T09:45:38+03:00\",\"message\":\"hello from api and this is an api component\"}")
 }

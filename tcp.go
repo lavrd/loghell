@@ -1,8 +1,8 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"io/ioutil"
 	"net"
 
 	"github.com/rs/zerolog/log"
@@ -48,13 +48,25 @@ func (s *TCPServer) Start() error {
 }
 
 func (s *TCPServer) Handler(conn net.Conn) {
-	buff, err := ioutil.ReadAll(conn)
-	if err != nil {
-		log.Error().Err(err)
-		return
-	}
+	defer func() {
+		log.Debug().Msgf("conn close with %s", conn.RemoteAddr().String())
 
-	log.Debug().Msgf(string(buff))
+		if err := conn.Close(); err != nil {
+			log.Error().Err(err)
+		}
+	}()
+
+	reader := bufio.NewReader(conn)
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		err := scanner.Err()
+		if err != nil {
+			log.Error().Err(err)
+			return
+		}
+
+		log.Debug().Msgf("message from %s | %s", conn.RemoteAddr().String(), scanner.Text())
+	}
 }
 
 func (s *TCPServer) Shutdown() error {

@@ -20,8 +20,7 @@ func main() {
 	verbose := flag.Bool("v", false, "verbose output")
 	flag.Parse()
 
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
-	log.Logger = log.Level(zerolog.ErrorLevel)
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}).Level(zerolog.ErrorLevel)
 	if *verbose {
 		log.Logger = log.Level(zerolog.DebugLevel)
 	}

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -13,13 +15,17 @@ var (
 	ErrExcMarkShouldBeFirst     = errors.New("exclamation mark should be first at the rule")
 )
 
-type Rule struct {
-	color   string
-	atSign  *regexp.Regexp
-	excMark *regexp.Regexp
+type Ruler struct {
+	rule *Rule
 }
 
-func ParseRule(ruleAsAString string) (*Rule, error) {
+type Rule struct {
+	color     string
+	atSignRe  *regexp.Regexp
+	excMarkRe *regexp.Regexp
+}
+
+func Parse(ruleAsAString string) (*Rule, error) {
 	excMarkIndex := strings.Index(ruleAsAString, "!")
 	atSignMarkIndex := strings.Index(ruleAsAString, "@")
 
@@ -27,53 +33,58 @@ func ParseRule(ruleAsAString string) (*Rule, error) {
 		return nil, ErrInvalidRule(ruleAsAString)
 	}
 
-	if excMarkIndex > atSignMarkIndex {
+	// excMark should be greater then atSign and atSign is found
+	if excMarkIndex > atSignMarkIndex && atSignMarkIndex != -1 {
 		return nil, ErrExcMarkShouldBeFirst
 	}
 
-	rule := &Rule{}
+	rule := &Rule{
+		color: RandColor(),
+	}
 	var err error
 
-	if rule.excMark, err = ParsePart(ruleAsAString, excMarkIndex); err != nil {
-		return nil, err
-	}
-
-	if rule.atSign, err = ParsePart(ruleAsAString, atSignMarkIndex); err != nil {
-		return nil, err
-	}
-
-	rule.color = RandColor()
-
-	return rule, nil
-}
-
-func ParsePart(rule string, index int) (*regexp.Regexp, error) {
-	if index != -1 {
-		rulePart := rule[:index]
-
-		re, err := regexp.Compile(rulePart)
+	if atSignMarkIndex == -1 {
+		rule.excMarkRe, err = parsePart(ruleAsAString, excMarkIndex+1, len(ruleAsAString))
 		if err != nil {
-			return nil, ErrInvalidRulePartForRegexp(rulePart)
+			return nil, err
 		}
-
-		return re, nil
-	}
-
-	return nil, nil
-}
-
-func ParseRules(rules string) ([]*Rule, error) {
-	var rsSlice []*Rule
-
-	rs := strings.Split(rules, ",")
-	for _, r := range rs {
-		rule, err := ParseRule(r)
+	} else {
+		rule.excMarkRe, err = parsePart(ruleAsAString, excMarkIndex+1, atSignMarkIndex)
 		if err != nil {
 			return nil, err
 		}
 
-		rsSlice = append(rsSlice, rule)
+		rule.atSignRe, err = parsePart(ruleAsAString, atSignMarkIndex+1, len(ruleAsAString))
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	return rsSlice, nil
+	return rule, nil
+}
+
+func parsePart(ruleAsAString string, start, end int) (*regexp.Regexp, error) {
+	rulePart := ruleAsAString[start:end]
+
+	re, err := regexp.Compile(rulePart)
+	if err != nil {
+		return nil, ErrInvalidRulePartForRegexp(rulePart)
+	}
+
+	return re, nil
+}
+
+func ExecRule(rule *Rule, logStr string) {
+	if !rule.excMarkRe.MatchString(logStr) {
+		log.Log().Msg("not matched")
+		return
+	}
+
+	if rule.atSignRe != nil {
+		s := rule.atSignRe.FindString(logStr)
+		s = fmt.Sprintf("<span style=\"%s\">%s</span>", rule.color, s)
+		logStr = rule.atSignRe.ReplaceAllString(logStr, s)
+	}
+
+	fmt.Println(logStr)
 }
