@@ -1,38 +1,50 @@
 package main
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
-func TestParseRule(t *testing.T) {
-	cases := []struct {
+var (
+	cases = []struct {
 		name string
 		rule string
-		err  error
+		log  string
 	}{
 		{
-			name: "correct rule",
-			rule: "!component@api",
-			err:  nil,
+			"correct",
+			"!level@fatal",
+			"{\"level\":\"fatal\"}",
 		},
 	}
+)
 
+func TestNewRule(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			rule, err := ParseRule(c.rule)
-			require.Equal(t, c.err, err)
+			rule, err := NewRule(c.rule)
+			require.NoError(t, err)
 			require.NotNil(t, rule)
-			t.Logf("%+v\n", rule)
 		})
 	}
 }
+func TestRule_Exec(t *testing.T) {
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			rule, err := NewRule(c.rule)
+			require.NoError(t, err)
+			require.NotNil(t, rule)
 
-func TestExecRule(t *testing.T) {
-	rule, err := ParseRule("!level@api")
-	require.NoError(t, err)
-	require.NotNil(t, rule)
+			// TODO rename eLog (how to name log after exec? after that check ws package for this)
+			eLog, err := rule.Exec(c.log)
+			require.NoError(t, err)
 
-	ExecRule(rule, "{\"level\":\"debug\",\"component\":\"api\",\"time\":\"2019-04-30T09:45:38+03:00\",\"message\":\"hello from api and this is an api component\"}")
+			shouldContain := []string{"<span style=\"", "\">fatal</span>"}
+			for _, sc := range shouldContain {
+				require.True(t, strings.Contains(eLog, sc), sc)
+			}
+		})
+	}
 }
