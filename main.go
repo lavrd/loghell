@@ -47,7 +47,7 @@ func main() {
 	interrupt := make(chan os.Signal)
 	signal.Notify(interrupt, syscall.SIGKILL, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
 	<-interrupt
-	logger.Debug().Msg("interrupt signal")
+	logger.Debug().Msg("interrupt signal is notified")
 
 	if err := tcpServer.Shutdown(); err != nil {
 		logger.Error().Err(err).Msg("tcp server shutdown error")

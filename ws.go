@@ -10,9 +10,14 @@ import (
 	"nhooyr.io/websocket"
 )
 
+type conn struct {
+	rule *Rule
+	conn *websocket.Conn
+}
+
 type WSServer struct {
 	port   int
-	conns  map[string]*websocket.Conn
+	conns  map[string]*conn
 	srv    *http.Server
 	logger zerolog.Logger
 }
@@ -20,27 +25,40 @@ type WSServer struct {
 func NewWSServer(port int) *WSServer {
 	return &WSServer{
 		port:   port,
-		conns:  make(map[string]*websocket.Conn),
+		conns:  make(map[string]*conn),
 		logger: SubLogger("ws"),
 	}
 }
 
 func (s *WSServer) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		conn, err := websocket.Accept(w, r, websocket.AcceptOptions{})
+		ruleAsAString := r.URL.Query().Get("rule")
+		rule, err := NewRule(ruleAsAString)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			if _, err := w.Write([]byte(err.Error())); err != nil {
+				s.logger.Error().Err(err).Msg("")
+			}
+			return
+		}
+
+		c, err := websocket.Accept(w, r, websocket.AcceptOptions{})
 		if err != nil {
 			s.logger.Error().Err(err).Msgf("accept connection %s error", r.RemoteAddr)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
-		s.logger.Debug().Msgf("new websocket connection %s", r.RemoteAddr)
-		s.conns[r.RemoteAddr] = conn
+		s.logger.Debug().Msgf("new connection %s", r.RemoteAddr)
+		s.conns[r.RemoteAddr] = &conn{
+			conn: c,
+			rule: rule,
+		}
 	})
 }
 
 func (s *WSServer) Start() error {
-	s.logger.Debug().Msgf("starting websocket server on port %d", s.port)
+	s.logger.Debug().Msgf("starting server on port %d", s.port)
 
 	s.srv = &http.Server{
 		Addr:    fmt.Sprintf(":%d", s.port),
@@ -51,10 +69,10 @@ func (s *WSServer) Start() error {
 }
 
 func (s *WSServer) Shutdown() error {
-	s.logger.Debug().Msg("shutdown websocket server")
+	s.logger.Debug().Msg("shutdown server")
 
 	for _, c := range s.conns {
-		if err := c.Close(websocket.StatusNormalClosure, "server shutdown"); err != nil {
+		if err := c.conn.Close(websocket.StatusNormalClosure, "server shutdown"); err != nil {
 			s.logger.Error().Err(err)
 		}
 	}
@@ -62,30 +80,40 @@ func (s *WSServer) Shutdown() error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
 	defer cancel()
 
-	return s.srv.Shutdown(ctx)
+	if err := s.srv.Shutdown(ctx); err != nil {
+		s.logger.Error().Err(err).Msg("shutdown server error")
+		return err
+	}
+	return nil
 }
 
-func (s *WSServer) Send(str string) {
-	s.logger.Debug().Msgf("send message to clients | %s", str)
-
+func (s *WSServer) PrepareAndSend(log string) {
 	for addr, c := range s.conns {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
-
-		writer, err := c.Writer(ctx, websocket.MessageText)
-		if err != nil {
-			s.logger.Error().Err(err).Msgf("cannot prepare writer for %s", addr)
-			cancel()
-			delete(s.conns, addr)
-			continue
+		l, err := c.rule.Exec(log)
+		if err == nil {
+			s.send(c.conn, addr, l)
 		}
+	}
+}
 
-		if _, err := writer.Write([]byte(str)); err != nil {
-			s.logger.Error().Err(err).Msgf("write message to %s error", addr)
-			cancel()
-			if err := writer.Close(); err != nil {
-				s.logger.Error().Err(err).Msgf("close connection with %s error", addr)
-			}
-			delete(s.conns, addr)
+func (s *WSServer) send(conn *websocket.Conn, addr, log string) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+	defer cancel()
+
+	s.logger.Debug().Msgf("send message to clients | %s", log)
+
+	writer, err := conn.Writer(ctx, websocket.MessageText)
+	if err != nil {
+		s.logger.Error().Err(err).Msgf("cannot prepare writer for %s", addr)
+		delete(s.conns, addr)
+		return
+	}
+
+	if _, err := writer.Write([]byte(log)); err != nil {
+		s.logger.Error().Err(err).Msgf("write message to %s error", addr)
+		if err := writer.Close(); err != nil {
+			s.logger.Error().Err(err).Msgf("close connection with %s error", addr)
 		}
+		delete(s.conns, addr)
 	}
 }

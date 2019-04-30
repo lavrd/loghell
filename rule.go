@@ -5,19 +5,14 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-
-	"github.com/rs/zerolog/log"
 )
 
 var (
 	ErrInvalidRule              = func(rule string) error { return fmt.Errorf("invalid rule: %s", rule) }
 	ErrInvalidRulePartForRegexp = func(rulePart string) error { return fmt.Errorf("invalid rule part %s", rulePart) }
 	ErrExcMarkShouldBeFirst     = errors.New("exclamation mark should be first at the rule")
+	ErrNotMatched               = errors.New("not matched")
 )
-
-type Ruler struct {
-	rule *Rule
-}
 
 type Rule struct {
 	color     string
@@ -25,7 +20,7 @@ type Rule struct {
 	excMarkRe *regexp.Regexp
 }
 
-func Parse(ruleAsAString string) (*Rule, error) {
+func NewRule(ruleAsAString string) (*Rule, error) {
 	excMarkIndex := strings.Index(ruleAsAString, "!")
 	atSignMarkIndex := strings.Index(ruleAsAString, "@")
 
@@ -38,23 +33,21 @@ func Parse(ruleAsAString string) (*Rule, error) {
 		return nil, ErrExcMarkShouldBeFirst
 	}
 
-	rule := &Rule{
-		color: RandColor(),
-	}
+	rule := &Rule{color: RandColor()}
 	var err error
 
 	if atSignMarkIndex == -1 {
-		rule.excMarkRe, err = parsePart(ruleAsAString, excMarkIndex+1, len(ruleAsAString))
+		rule.excMarkRe, err = rule.parsePart(ruleAsAString, excMarkIndex+1, len(ruleAsAString))
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		rule.excMarkRe, err = parsePart(ruleAsAString, excMarkIndex+1, atSignMarkIndex)
+		rule.excMarkRe, err = rule.parsePart(ruleAsAString, excMarkIndex+1, atSignMarkIndex)
 		if err != nil {
 			return nil, err
 		}
 
-		rule.atSignRe, err = parsePart(ruleAsAString, atSignMarkIndex+1, len(ruleAsAString))
+		rule.atSignRe, err = rule.parsePart(ruleAsAString, atSignMarkIndex+1, len(ruleAsAString))
 		if err != nil {
 			return nil, err
 		}
@@ -63,7 +56,7 @@ func Parse(ruleAsAString string) (*Rule, error) {
 	return rule, nil
 }
 
-func parsePart(ruleAsAString string, start, end int) (*regexp.Regexp, error) {
+func (r *Rule) parsePart(ruleAsAString string, start, end int) (*regexp.Regexp, error) {
 	rulePart := ruleAsAString[start:end]
 
 	re, err := regexp.Compile(rulePart)
@@ -74,17 +67,16 @@ func parsePart(ruleAsAString string, start, end int) (*regexp.Regexp, error) {
 	return re, nil
 }
 
-func ExecRule(rule *Rule, logStr string) {
-	if !rule.excMarkRe.MatchString(logStr) {
-		log.Log().Msg("not matched")
-		return
+func (r *Rule) Exec(log string) (string, error) {
+	if !r.excMarkRe.MatchString(log) {
+		return "", ErrNotMatched
 	}
 
-	if rule.atSignRe != nil {
-		s := rule.atSignRe.FindString(logStr)
-		s = fmt.Sprintf("<span style=\"%s\">%s</span>", rule.color, s)
-		logStr = rule.atSignRe.ReplaceAllString(logStr, s)
+	if r.atSignRe != nil {
+		s := r.atSignRe.FindString(log)
+		s = fmt.Sprintf("<span style=\"%s\">%s</span>", r.color, s)
+		log = r.atSignRe.ReplaceAllString(log, s)
 	}
 
-	fmt.Println(logStr)
+	return log, nil
 }
