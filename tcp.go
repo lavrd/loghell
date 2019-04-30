@@ -23,7 +23,7 @@ func NewTCPServer(port int, ws *WSServer) *TCPServer {
 	return &TCPServer{
 		port:   port,
 		ws:     ws,
-		logger: SubLog("tcp"),
+		logger: SubLogger("tcp"),
 	}
 }
 

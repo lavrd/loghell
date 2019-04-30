@@ -25,7 +25,7 @@ func main() {
 		log.Logger = log.Level(zerolog.DebugLevel)
 	}
 
-	logger := SubLog("main")
+	logger := SubLogger("main")
 
 	logger.Debug().Msg("starting loghell")
 

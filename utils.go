@@ -11,6 +11,14 @@ import (
 const MaxIntensity = 255
 
 func RandColor() string {
+	getHex := func(num int) string {
+		hex := fmt.Sprintf("%x", num)
+		if len(hex) == 1 {
+			hex = "0" + hex
+		}
+		return hex
+	}
+
 	return fmt.Sprintf("#%s%s%s",
 		getHex(rand.Intn(MaxIntensity)),
 		getHex(rand.Intn(MaxIntensity)),
@@ -18,14 +26,6 @@ func RandColor() string {
 	)
 }
 
-func getHex(num int) string {
-	hex := fmt.Sprintf("%x", num)
-	if len(hex) == 1 {
-		hex = "0" + hex
-	}
-	return hex
-}
-
-func SubLog(component string) zerolog.Logger {
+func SubLogger(component string) zerolog.Logger {
 	return log.With().Str("component", component).Logger()
 }

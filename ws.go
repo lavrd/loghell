@@ -8,7 +8,6 @@ import (
 
 	"github.com/rs/zerolog"
 	"nhooyr.io/websocket"
-	"nhooyr.io/websocket/wsjson"
 )
 
 type WSServer struct {
@@ -22,14 +21,12 @@ func NewWSServer(port int) *WSServer {
 	return &WSServer{
 		port:   port,
 		conns:  make(map[string]*websocket.Conn),
-		logger: SubLog("ws"),
+		logger: SubLogger("ws"),
 	}
 }
 
 func (s *WSServer) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		s.logger.Debug().Msgf("new websocket connection %s", r.RemoteAddr)
-
 		conn, err := websocket.Accept(w, r, websocket.AcceptOptions{})
 		if err != nil {
 			s.logger.Error().Err(err).Msgf("accept connection %s error", r.RemoteAddr)
@@ -37,6 +34,7 @@ func (s *WSServer) Handler() http.Handler {
 			return
 		}
 
+		s.logger.Debug().Msgf("new websocket connection %s", r.RemoteAddr)
 		s.conns[r.RemoteAddr] = conn
 	})
 }
@@ -67,16 +65,27 @@ func (s *WSServer) Shutdown() error {
 	return s.srv.Shutdown(ctx)
 }
 
-func (s *WSServer) Send(v string) {
-	s.logger.Debug().Msgf("send message to clients")
+func (s *WSServer) Send(str string) {
+	s.logger.Debug().Msgf("send message to clients | %s", str)
 
-	for _, c := range s.conns {
+	for addr, c := range s.conns {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
 
-		if err := wsjson.Write(ctx, c, nil); err != nil {
-			s.logger.Error().Err(err)
+		writer, err := c.Writer(ctx, websocket.MessageText)
+		if err != nil {
+			s.logger.Error().Err(err).Msgf("cannot prepare writer for %s", addr)
+			cancel()
+			delete(s.conns, addr)
+			continue
 		}
 
-		cancel()
+		if _, err := writer.Write([]byte(str)); err != nil {
+			s.logger.Error().Err(err).Msgf("write message to %s error", addr)
+			cancel()
+			if err := writer.Close(); err != nil {
+				s.logger.Error().Err(err).Msgf("close connection with %s error", addr)
+			}
+			delete(s.conns, addr)
+		}
 	}
 }
