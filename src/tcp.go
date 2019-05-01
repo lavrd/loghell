@@ -39,15 +39,15 @@ func (s *TCPServer) Start() error {
 			return nil
 		}
 
-		go s.Handler(conn)
+		go s.Handler(conn, s.logger.With().Str("addr", conn.RemoteAddr().String()).Logger())
 	}
 }
 
-func (s *TCPServer) Handler(conn net.Conn) {
-	s.logger.Debug().Msgf("new connection %s", conn.RemoteAddr().String())
+func (s *TCPServer) Handler(conn net.Conn, logger zerolog.Logger) {
+	logger.Debug().Msg("new connection")
 
 	defer func() {
-		s.logger.Debug().Msgf("connection close with %s", conn.RemoteAddr().String())
+		s.logger.Debug().Msg("connection close with")
 
 		if err := conn.Close(); err != nil {
 			s.logger.Error().Err(err)
@@ -64,8 +64,7 @@ func (s *TCPServer) Handler(conn net.Conn) {
 		}
 
 		log := scanner.Text()
-		s.logger.Debug().Msgf("received message from %s | %s", conn.RemoteAddr().String(), log)
-
+		s.logger.Debug().Msgf("received message from | %s", log)
 		s.ws.PrepareAndSend(log)
 	}
 }

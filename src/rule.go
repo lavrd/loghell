@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"regexp"
@@ -21,10 +20,13 @@ type Rule struct {
 }
 
 func NewRule(ruleAsAString string) (*Rule, error) {
+	// looking for exclamation mark in rule string
 	excMarkIndex := strings.Index(ruleAsAString, "!")
+	// looking for atSign mark in rule string
 	atSignMarkIndex := strings.Index(ruleAsAString, "@")
 
-	if excMarkIndex == -1 && atSignMarkIndex == -1 {
+	// rule should contain exclamation mark
+	if excMarkIndex == -1 {
 		return nil, ErrInvalidRule(ruleAsAString)
 	}
 
@@ -74,13 +76,9 @@ func (r *Rule) Exec(log string) (string, error) {
 
 	if r.atSignRe != nil {
 		s := r.atSignRe.FindString(log)
+		// 31 - red color
 		s = fmt.Sprintf("\x1b[%dm%v\x1b[0m", 31, s)
-		fmt.Println(s)
-		fmt.Println([]byte(s))
-		fmt.Println([]byte("debug"))
-		fmt.Println(hex.EncodeToString([]byte(s)))
-		fmt.Println(hex.EncodeToString([]byte("debug")))
-		fmt.Println("-----------------------------------")
+		// 1 - bold font
 		s = fmt.Sprintf("\x1b[%dm%v\x1b[0m", 1, s)
 		log = r.atSignRe.ReplaceAllString(log, s)
 	}

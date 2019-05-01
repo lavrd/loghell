@@ -1,7 +1,6 @@
 package main
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -9,14 +8,16 @@ import (
 
 var (
 	cases = []struct {
-		name string
-		rule string
-		log  string
+		name          string
+		rule          string
+		log           string
+		expectedBytes []byte
 	}{
 		{
 			"correct",
 			"!level@fatal",
 			"{\"level\":\"fatal\"}",
+			[]byte{27, 91, 49, 109, 27, 91, 51, 49, 109, 102, 97, 116, 97, 108, 27, 91, 48, 109, 27, 91, 48, 109},
 		},
 	}
 )
@@ -37,14 +38,9 @@ func TestRule_Exec(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, rule)
 
-			// TODO rename eLog (how to name log after exec? after that check ws package for this)
-			eLog, err := rule.Exec(c.log)
+			log, err := rule.Exec(c.log)
 			require.NoError(t, err)
-
-			shouldContain := []string{"<span style=\"", "\">fatal</span>"}
-			for _, sc := range shouldContain {
-				require.True(t, strings.Contains(eLog, sc), sc)
-			}
+			require.Equal(t, c.expectedBytes, []byte(log[10:32]))
 		})
 	}
 }
