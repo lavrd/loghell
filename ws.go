@@ -68,7 +68,7 @@ func (s *WSServer) Start() error {
 	return s.srv.ListenAndServe()
 }
 
-func (s *WSServer) Shutdown() error {
+func (s *WSServer) Shutdown() {
 	s.logger.Debug().Msg("shutdown server")
 
 	for _, c := range s.conns {
@@ -82,22 +82,22 @@ func (s *WSServer) Shutdown() error {
 
 	if err := s.srv.Shutdown(ctx); err != nil {
 		s.logger.Error().Err(err).Msg("shutdown server error")
-		return err
 	}
-	return nil
 }
 
 func (s *WSServer) PrepareAndSend(log string) {
 	for addr, c := range s.conns {
 		l, err := c.rule.Exec(log)
+		fmt.Println(">>>", l)
 		if err == nil {
 			s.send(c.conn, addr, l)
 		}
 	}
 }
 
+// todo in error need to close connection?
 func (s *WSServer) send(conn *websocket.Conn, addr, log string) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
 
 	s.logger.Debug().Msgf("send message to clients | %s", log)
@@ -105,15 +105,11 @@ func (s *WSServer) send(conn *websocket.Conn, addr, log string) {
 	writer, err := conn.Writer(ctx, websocket.MessageText)
 	if err != nil {
 		s.logger.Error().Err(err).Msgf("cannot prepare writer for %s", addr)
-		delete(s.conns, addr)
 		return
 	}
+	defer writer.Close()
 
 	if _, err := writer.Write([]byte(log)); err != nil {
 		s.logger.Error().Err(err).Msgf("write message to %s error", addr)
-		if err := writer.Close(); err != nil {
-			s.logger.Error().Err(err).Msgf("close connection with %s error", addr)
-		}
-		delete(s.conns, addr)
 	}
 }

@@ -35,7 +35,8 @@ func (s *TCPServer) Start() error {
 	for {
 		conn, err := s.listener.Accept()
 		if err != nil {
-			return err
+			s.logger.Error().Err(err).Msg("accept tcp connection error")
+			return nil
 		}
 
 		go s.Handler(conn)
@@ -69,11 +70,9 @@ func (s *TCPServer) Handler(conn net.Conn) {
 	}
 }
 
-func (s *TCPServer) Shutdown() error {
+func (s *TCPServer) Shutdown() {
 	s.logger.Debug().Msg("shutdown tcp server")
 	if err := s.listener.Close(); err != nil {
 		s.logger.Error().Err(err).Msgf("shutdown server error")
-		return err
 	}
-	return nil
 }

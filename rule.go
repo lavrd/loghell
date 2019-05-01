@@ -69,10 +69,12 @@ func (r *Rule) parsePart(ruleAsAString string, start, end int) (*regexp.Regexp, 
 
 func (r *Rule) Exec(log string) (string, error) {
 	if !r.excMarkRe.MatchString(log) {
+		fmt.Println(">>>>!!!!<<<<")
 		return "", ErrNotMatched
 	}
 
 	if r.atSignRe != nil {
+		fmt.Println("!!!!!!!!!")
 		s := r.atSignRe.FindString(log)
 		s = fmt.Sprintf("<span style=\"%s\">%s</span>", r.color, s)
 		log = r.atSignRe.ReplaceAllString(log, s)

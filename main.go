@@ -34,13 +34,13 @@ func main() {
 
 	go func() {
 		if err := wsServer.Start(); err != nil {
-			logger.Fatal().Err(err)
+			logger.Fatal().Err(err).Msg("start websocket server error")
 		}
 	}()
 
 	go func() {
 		if err := tcpServer.Start(); err != nil {
-			logger.Fatal().Err(err)
+			logger.Fatal().Err(err).Msg("start tcp server error")
 		}
 	}()
 
@@ -49,13 +49,8 @@ func main() {
 	<-interrupt
 	logger.Debug().Msg("interrupt signal is notified")
 
-	if err := tcpServer.Shutdown(); err != nil {
-		logger.Error().Err(err).Msg("tcp server shutdown error")
-	}
-
-	if err := wsServer.Shutdown(); err != nil {
-		logger.Error().Err(err).Msg("ws server shutdown error")
-	}
+	tcpServer.Shutdown()
+	wsServer.Shutdown()
 
 	logger.Debug().Msg("loghell shutdown")
 }
