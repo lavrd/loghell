@@ -54,3 +54,5 @@ func main() {
 
 	logger.Debug().Msg("loghell shutdown")
 }
+
+// todo at first need to prepare log for every ws client and then send to clients

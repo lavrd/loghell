@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"regexp"
@@ -15,7 +16,6 @@ var (
 )
 
 type Rule struct {
-	color     string
 	atSignRe  *regexp.Regexp
 	excMarkRe *regexp.Regexp
 }
@@ -33,7 +33,7 @@ func NewRule(ruleAsAString string) (*Rule, error) {
 		return nil, ErrExcMarkShouldBeFirst
 	}
 
-	rule := &Rule{color: RandColor()}
+	rule := &Rule{}
 	var err error
 
 	if atSignMarkIndex == -1 {
@@ -69,14 +69,19 @@ func (r *Rule) parsePart(ruleAsAString string, start, end int) (*regexp.Regexp, 
 
 func (r *Rule) Exec(log string) (string, error) {
 	if !r.excMarkRe.MatchString(log) {
-		fmt.Println(">>>>!!!!<<<<")
 		return "", ErrNotMatched
 	}
 
 	if r.atSignRe != nil {
-		fmt.Println("!!!!!!!!!")
 		s := r.atSignRe.FindString(log)
-		s = fmt.Sprintf("<span style=\"%s\">%s</span>", r.color, s)
+		s = fmt.Sprintf("\x1b[%dm%v\x1b[0m", 31, s)
+		fmt.Println(s)
+		fmt.Println([]byte(s))
+		fmt.Println([]byte("debug"))
+		fmt.Println(hex.EncodeToString([]byte(s)))
+		fmt.Println(hex.EncodeToString([]byte("debug")))
+		fmt.Println("-----------------------------------")
+		s = fmt.Sprintf("\x1b[%dm%v\x1b[0m", 1, s)
 		log = r.atSignRe.ReplaceAllString(log, s)
 	}
 

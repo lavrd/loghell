@@ -88,7 +88,6 @@ func (s *WSServer) Shutdown() {
 func (s *WSServer) PrepareAndSend(log string) {
 	for addr, c := range s.conns {
 		l, err := c.rule.Exec(log)
-		fmt.Println(">>>", l)
 		if err == nil {
 			s.send(c.conn, addr, l)
 		}
