@@ -47,7 +47,7 @@ func (s *TCPServer) Handler(conn net.Conn, logger zerolog.Logger) {
 	logger.Debug().Msg("new connection")
 
 	defer func() {
-		s.logger.Debug().Msg("connection close with")
+		s.logger.Debug().Msg("connection closed")
 
 		if err := conn.Close(); err != nil {
 			s.logger.Error().Err(err)

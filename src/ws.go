@@ -58,7 +58,7 @@ func (s *WSServer) Handler() http.Handler {
 			_, _, err := c.Reader(context.Background())
 			if err != nil {
 				if strings.Contains(err.Error(), io.EOF.Error()) {
-					logger.Info().Msg("connection closed")
+					logger.Debug().Msg("connection closed")
 				} else {
 					logger.Error().Err(err).Msg("cannot prepare reader")
 				}

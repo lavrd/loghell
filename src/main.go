@@ -28,7 +28,7 @@ func main() {
 	}
 
 	logger := SubLogger("main")
-	logger.Debug().Msg("starting loghell")
+	logger.Info().Msg("starting loghell")
 
 	wsServer := NewWSServer(*wsPort)
 	tcpServer := NewTCPServer(*tcpPort, wsServer)
@@ -52,5 +52,5 @@ func main() {
 	<-interrupt
 	logger.Debug().Msg("interrupt signal is notified")
 
-	logger.Debug().Msg("loghell shutdown")
+	logger.Info().Msg("loghell shutdown")
 }
