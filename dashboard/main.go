@@ -70,6 +70,6 @@ func main() {
 			log.Fatal().Err(err).Msg("read from reader error")
 		}
 
-		fmt.Println(string(buff))
+		fmt.Printf("\a%s\n", string(buff))
 	}
 }
