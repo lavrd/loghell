@@ -18,6 +18,7 @@ import (
 func main() {
 	endpoint := flag.String("e", "ws://127.0.0.1:3032/", "set loghell websocket server endpoint")
 	rule := flag.String("r", "!level@debug", "set loghell rule")
+	notification := flag.Bool("n", false, "enabled new log notification")
 	flag.Parse()
 
 	log.Logger = log.
@@ -53,6 +54,11 @@ func main() {
 		}
 	}()
 
+	format := "%s\n"
+	if *notification {
+		format = "\a" + format
+	}
+
 	for {
 		_, reader, err := c.Reader(context.Background())
 		if err != nil {
@@ -70,6 +76,6 @@ func main() {
 			log.Fatal().Err(err).Msg("read from reader error")
 		}
 
-		fmt.Printf("\a%s\n", string(buff))
+		fmt.Printf(format, string(buff))
 	}
 }
