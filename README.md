@@ -1,8 +1,8 @@
 # loghell
 Pretty simple log management tool
 
-### [dashboard](./dashboard/)
-### [example app](./example/)
+### [dashboard](./dashboard/README.md)
+### [example app](./example/README.md)
 
 ### Usage
 ```bash
@@ -14,4 +14,5 @@ Usage of loghell
     	set ws server port (default 3032)
     	
 # start loghell
-$ go run ./src/main.go```
+$ go run ./src/main.go
+```
