@@ -24,7 +24,7 @@ func NewTCPServer(port int, ws *WSServer) *TCPServer {
 }
 
 func (s *TCPServer) Start() error {
-	s.logger.Debug().Msgf("starting server on port %d", s.port)
+	s.logger.Info().Msgf("starting server on port %d", s.port)
 
 	var err error
 	s.listener, err = net.Listen("tcp", fmt.Sprintf(":%d", s.port))
@@ -70,7 +70,7 @@ func (s *TCPServer) Handler(conn net.Conn, logger zerolog.Logger) {
 }
 
 func (s *TCPServer) Shutdown() {
-	s.logger.Debug().Msg("shutdown tcp server")
+	s.logger.Debug().Msg("shutdown server")
 	if err := s.listener.Close(); err != nil {
 		s.logger.Error().Err(err).Msgf("shutdown server error")
 	}

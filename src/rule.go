@@ -5,18 +5,22 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/thedevsaddam/gojsonq"
 )
 
 var (
 	ErrInvalidRule              = func(rule string) error { return fmt.Errorf("invalid rule: %s", rule) }
-	ErrInvalidRulePartForRegexp = func(rulePart string) error { return fmt.Errorf("invalid rule part %s", rulePart) }
+	ErrInvalidRulePartForRegexp = func(rulePart string) error { return fmt.Errorf("invalid rule part: %s", rulePart) }
 	ErrExcMarkShouldBeFirst     = errors.New("exclamation mark should be first at the rule")
 	ErrNotMatched               = errors.New("not matched")
+	ErrKeyNotFound              = func(key string) error { return fmt.Errorf("key not found: %s", key) }
 )
 
 type Rule struct {
-	atSignRe  *regexp.Regexp
-	excMarkRe *regexp.Regexp
+	atSignRe   *regexp.Regexp
+	excMarkRe  *regexp.Regexp
+	excMarkKey string
 }
 
 func NewRule(ruleAsAString string) (*Rule, error) {
@@ -25,8 +29,8 @@ func NewRule(ruleAsAString string) (*Rule, error) {
 	// looking for atSign mark in rule string
 	atSignMarkIndex := strings.Index(ruleAsAString, "@")
 
-	// rule should contain exclamation mark
-	if excMarkIndex == -1 {
+	// rule should contain exclamation mark and at sign mark
+	if excMarkIndex == -1 || atSignMarkIndex == -1 {
 		return nil, ErrInvalidRule(ruleAsAString)
 	}
 
@@ -35,24 +39,29 @@ func NewRule(ruleAsAString string) (*Rule, error) {
 		return nil, ErrExcMarkShouldBeFirst
 	}
 
-	rule := &Rule{}
+	excMarkRule := ruleAsAString[excMarkIndex+1 : atSignMarkIndex]
+	atSignMarkRule := ruleAsAString[atSignMarkIndex : len(ruleAsAString)-1]
+
+	excMarkRuleSplit := strings.Split(excMarkRule, "=")
+
+	if len(excMarkRuleSplit) != 2 {
+		return nil, ErrInvalidRule(excMarkRule)
+	}
+
+	excMarkRuleLeft, excMarkRuleRight := excMarkRuleSplit[0], excMarkRuleSplit[1]
+
+	rule := &Rule{
+		excMarkKey: excMarkRuleLeft,
+	}
 	var err error
 
-	if atSignMarkIndex == -1 {
-		rule.excMarkRe, err = rule.parsePart(ruleAsAString, excMarkIndex+1, len(ruleAsAString))
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		rule.excMarkRe, err = rule.parsePart(ruleAsAString, excMarkIndex+1, atSignMarkIndex)
-		if err != nil {
-			return nil, err
-		}
-
-		rule.atSignRe, err = rule.parsePart(ruleAsAString, atSignMarkIndex+1, len(ruleAsAString))
-		if err != nil {
-			return nil, err
-		}
+	rule.excMarkRe, err = regexp.Compile(excMarkRuleRight)
+	if err != nil {
+		return nil, ErrInvalidRulePartForRegexp(excMarkRuleRight)
+	}
+	rule.atSignRe, err = regexp.Compile(atSignMarkRule)
+	if err != nil {
+		return nil, ErrInvalidRulePartForRegexp(excMarkRuleRight)
 	}
 
 	return rule, nil
@@ -70,18 +79,23 @@ func (r *Rule) parsePart(ruleAsAString string, start, end int) (*regexp.Regexp, 
 }
 
 func (r *Rule) Exec(log string) (string, error) {
-	if !r.excMarkRe.MatchString(log) {
+	excMarkRes := gojsonq.New().JSONString(log).Find(r.excMarkKey)
+	if excMarkRes == nil {
+		return "", ErrKeyNotFound(r.excMarkKey)
+	}
+
+	fmt.Println(excMarkRes)
+
+	if !r.excMarkRe.Match(excMarkRes.([]byte)) || !r.atSignRe.MatchString(log) {
 		return "", ErrNotMatched
 	}
 
-	if r.atSignRe != nil {
-		s := r.atSignRe.FindString(log)
-		// 31 - red color
-		s = fmt.Sprintf("\x1b[%dm%v\x1b[0m", 31, s)
-		// 1 - bold font
-		s = fmt.Sprintf("\x1b[%dm%v\x1b[0m", 1, s)
-		log = r.atSignRe.ReplaceAllString(log, s)
-	}
+	s := r.atSignRe.FindString(log)
+	// 31 - red color
+	s = fmt.Sprintf("\x1b[%dm%v\x1b[0m", 31, s)
+	// 1 - bold font
+	s = fmt.Sprintf("\x1b[%dm%v\x1b[0m", 1, s)
+	log = r.atSignRe.ReplaceAllString(log, s)
 
 	return log, nil
 }

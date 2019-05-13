@@ -77,7 +77,7 @@ func (s *WSServer) Handler() http.Handler {
 }
 
 func (s *WSServer) Start() error {
-	s.logger.Debug().Msgf("starting server on port %d", s.port)
+	s.logger.Info().Msgf("starting server on port %d", s.port)
 
 	s.srv = &http.Server{
 		Addr:    fmt.Sprintf(":%d", s.port),

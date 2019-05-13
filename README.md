@@ -1,7 +1,6 @@
 # loghell
 Pretty simple log management tool
 
-### [dashboard](./dashboard/README.md)
 ### [example app](./example/README.md)
 
 ### Usage
