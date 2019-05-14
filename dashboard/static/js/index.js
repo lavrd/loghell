@@ -1,7 +1,8 @@
 let ws = null
 
 window.onload = () => {
-  ws = new WebSocket('ws://javascript.ru/ws')
+  console.log(wsPort)
+  ws = new WebSocket('ws://127.0.0.1:' + wsPort + '/?rule=!level=debug@debug')
   initWebsocket()
 }
 
@@ -9,17 +10,17 @@ window.onbeforeunload = () => {
   ws.onclose = () => {
     // disable onclose handler first
   }
-  ws.close()
+  ws.close(1001, 'browser page closed')
 }
 
 const initWebsocket = () => {
   ws.onclose = (event) => {
     if (event.wasClean) {
-      alert('websocket connection closed')
+      console.log('websocket connection closed')
     } else {
-      alert('websocket connection interrupt')
+      console.log('websocket connection interrupt')
     }
-    alert('unknown problem with websocket')
+    console.log('unknown problem with websocket')
   }
 
   ws.onmessage = (event) => {
@@ -27,6 +28,6 @@ const initWebsocket = () => {
   }
 
   ws.onerror = (error) => {
-    alert('error ' + error.message)
+    console.log('error ' + error.message)
   }
 }

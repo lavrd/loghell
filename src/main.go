@@ -14,7 +14,6 @@ import (
 func main() {
 	tcpPort := flag.Int("tcp", 3031, "set tcp server port")
 	wsPort := flag.Int("ws", 3032, "set ws server port")
-	// TODO update docs
 	httpPort := flag.Int("http", 3033, "set http server port")
 	verbose := flag.Bool("v", false, "verbose output")
 	flag.Parse()
@@ -34,7 +33,10 @@ func main() {
 
 	wsServer := NewWSServer(*wsPort)
 	tcpServer := NewTCPServer(*tcpPort, wsServer)
-	httpServer := NewHTTPServer(*httpPort)
+	httpServer, err := NewHTTPServer(*httpPort, *wsPort)
+	if err != nil {
+		log.Fatal().Err(err).Msg("initialized http server error")
+	}
 
 	go func() {
 		if err := wsServer.Start(); err != nil {

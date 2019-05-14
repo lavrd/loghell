@@ -3,33 +3,58 @@ package main
 import (
 	"context"
 	"fmt"
+	"html/template"
 	"net/http"
 	"time"
 
 	"github.com/rs/zerolog"
 )
 
-type HTTPServer struct {
-	port   int
-	logger zerolog.Logger
-	srv    *http.Server
+type TMPLData struct {
+	WSPort int
 }
 
-func NewHTTPServer(port int) *HTTPServer {
-	return &HTTPServer{
-		port:   port,
+type HTTPServer struct {
+	logger   zerolog.Logger
+	srv      *http.Server
+	tmpl     *template.Template
+	tmplData *TMPLData
+}
+
+func NewHTTPServer(port, wsPort int) (*HTTPServer, error) {
+
+	httpServer := &HTTPServer{
 		logger: SubLogger("http"),
+		// tmpl:     tmpl,
+		tmplData: &TMPLData{WSPort: wsPort},
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", httpServer.DashboardHandler)
+	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./dashboard/static/"))))
+
+	httpServer.srv = &http.Server{
+		Addr:    fmt.Sprintf(":%d", port),
+		Handler: mux,
+	}
+
+	return httpServer, nil
+}
+
+func (s *HTTPServer) DashboardHandler(w http.ResponseWriter, r *http.Request) {
+	tmpl, err := template.ParseFiles("./dashboard/index.html")
+	if err != nil {
+		// return nil, err
+	}
+
+	if err := tmpl.Execute(w, s.tmplData); err != nil {
+		// TODO don't panic pls
+		panic(err)
 	}
 }
 
 func (s *HTTPServer) Start() error {
-	s.logger.Info().Msgf("starting server on port %d", s.port)
-
-	s.srv = &http.Server{
-		Addr:    fmt.Sprintf(":%d", s.port),
-		Handler: http.FileServer(http.Dir("./dashboard/")),
-	}
-
+	s.logger.Info().Msgf("starting server on %s", s.srv.Addr)
 	return s.srv.ListenAndServe()
 }
 

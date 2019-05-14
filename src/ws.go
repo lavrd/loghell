@@ -19,18 +19,23 @@ type conn struct {
 }
 
 type WSServer struct {
-	port   int
 	conns  map[string]*conn
 	srv    *http.Server
 	logger zerolog.Logger
 }
 
 func NewWSServer(port int) *WSServer {
-	return &WSServer{
-		port:   port,
+	wss := &WSServer{
 		conns:  make(map[string]*conn),
 		logger: SubLogger("ws"),
 	}
+
+	wss.srv = &http.Server{
+		Addr:    fmt.Sprintf(":%d", port),
+		Handler: wss.Handler(),
+	}
+
+	return wss
 }
 
 func (s *WSServer) Handler() http.Handler {
@@ -47,7 +52,9 @@ func (s *WSServer) Handler() http.Handler {
 			return
 		}
 
-		c, err := websocket.Accept(w, r, websocket.AcceptOptions{})
+		c, err := websocket.Accept(w, r, websocket.AcceptOptions{
+			InsecureSkipVerify: true,
+		})
 		if err != nil {
 			logger.Error().Err(err).Msg("accept connection error")
 			w.WriteHeader(http.StatusInternalServerError)
@@ -77,13 +84,7 @@ func (s *WSServer) Handler() http.Handler {
 }
 
 func (s *WSServer) Start() error {
-	s.logger.Info().Msgf("starting server on port %d", s.port)
-
-	s.srv = &http.Server{
-		Addr:    fmt.Sprintf(":%d", s.port),
-		Handler: s.Handler(),
-	}
-
+	s.logger.Info().Msgf("starting server on %s", s.srv.Addr)
 	return s.srv.ListenAndServe()
 }
 
