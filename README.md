@@ -3,6 +3,15 @@ Pretty simple log management tool
 
 ### [example app](./example/README.md)
 
+### Docker usage
+```bash
+# up
+docker-compose up -d --build
+
+# down
+docker-compose down
+```
+
 ### Usage
 ```bash
 Usage of loghell:
@@ -15,5 +24,5 @@ Usage of loghell:
     	set ws server port (default 3032)
     	
 # start loghell
-$ go run ./src/main.go
+go run ./src/main.go
 ```
