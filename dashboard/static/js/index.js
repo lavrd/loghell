@@ -25,7 +25,6 @@ const stop = () => {
     ws.onclose = () => {
       // disable onclose handler first
     }
-    // TODO why here we don't have access to status code and reason parameters?
     ws.close()
     ws = null
   }

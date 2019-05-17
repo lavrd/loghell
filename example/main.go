@@ -2,6 +2,8 @@ package main
 
 import (
 	"flag"
+	"fmt"
+	"math/rand"
 	"net"
 	"time"
 
@@ -21,7 +23,11 @@ func (w *LoghellWriter) Write(p []byte) (int, error) {
 }
 
 func main() {
-	tick := flag.Duration("t", time.Millisecond*500, "set tick duration for send logs to loghell")
+	rand.Seed(time.Now().UnixNano())
+
+	dur, _ := time.ParseDuration(fmt.Sprintf("%dms", rand.Intn(4500)+501))
+
+	tick := flag.Duration("t", dur, "set tick duration for send logs to loghell")
 	endpoint := flag.String("e", "127.0.0.1:3031", "set loghell server endpoint")
 	flag.Parse()
 
