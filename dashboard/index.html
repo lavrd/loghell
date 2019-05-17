@@ -11,6 +11,17 @@
 <body>
 <script>let wsPort = {{.WSPort}}</script>
 
+<section id="root">
+  <label>
+    rule
+    <input placeholder="!level=error@connection" id="rule-input"/>
+  </label>
+  <button onclick="start()">start</button>
+  <button onclick="stop()">stop</button>
+
+  <section id="logs-output"/>
+</section>
+
 <script src="static/js/index.js"></script>
 </body>
 </html>

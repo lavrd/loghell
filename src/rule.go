@@ -15,6 +15,7 @@ var (
 	ErrExcMarkShouldBeFirst     = errors.New("exclamation mark should be first at the rule")
 	ErrNotMatched               = errors.New("not matched")
 	ErrKeyNotFound              = func(key string) error { return fmt.Errorf("key not found: %s", key) }
+	ErrIncorrectTypeForRule     = errors.New("incorrect type for rule")
 )
 
 type Rule struct {
@@ -40,7 +41,7 @@ func NewRule(ruleAsAString string) (*Rule, error) {
 	}
 
 	excMarkRule := ruleAsAString[excMarkIndex+1 : atSignMarkIndex]
-	atSignMarkRule := ruleAsAString[atSignMarkIndex : len(ruleAsAString)-1]
+	atSignMarkRule := ruleAsAString[atSignMarkIndex+1:]
 
 	excMarkRuleSplit := strings.Split(excMarkRule, "=")
 
@@ -84,17 +85,18 @@ func (r *Rule) Exec(log string) (string, error) {
 		return "", ErrKeyNotFound(r.excMarkKey)
 	}
 
-	fmt.Println(excMarkRes)
+	switch excMarkRes.(type) {
+	case string:
+	default:
+		return "", ErrIncorrectTypeForRule
+	}
 
-	if !r.excMarkRe.Match(excMarkRes.([]byte)) || !r.atSignRe.MatchString(log) {
+	if !r.excMarkRe.MatchString(excMarkRes.(string)) || !r.atSignRe.MatchString(log) {
 		return "", ErrNotMatched
 	}
 
 	s := r.atSignRe.FindString(log)
-	// 31 - red color
-	s = fmt.Sprintf("\x1b[%dm%v\x1b[0m", 31, s)
-	// 1 - bold font
-	s = fmt.Sprintf("\x1b[%dm%v\x1b[0m", 1, s)
+	s = fmt.Sprintf(" <span class=\"highlighted\">%s</span>", s)
 	log = r.atSignRe.ReplaceAllString(log, s)
 
 	return log, nil

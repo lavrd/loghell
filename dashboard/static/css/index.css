@@ -3,3 +3,35 @@
 body {
   font-family: 'Roboto', sans-serif;
 }
+
+#root > p {
+  box-shadow: 1px 1px 1px black;
+  border: 1px solid black;
+  border-radius: 5px;
+}
+
+.log {
+  margin: 5px;
+  padding: 5px;
+  font-size: 12px;
+}
+
+.log:hover {
+  border: 1px solid blue;
+  cursor: pointer;
+}
+
+.error {
+  color: black;
+  background: tomato;
+  padding: 25px;
+  text-align: center;
+}
+
+.highlighted {
+  color: cadetblue;
+}
+
+.new-log {
+  background-color: rebeccapurple;
+}

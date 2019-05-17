@@ -22,10 +22,14 @@ type HTTPServer struct {
 }
 
 func NewHTTPServer(port, wsPort int) (*HTTPServer, error) {
+	tmpl, err := template.ParseFiles("./dashboard/index.html")
+	if err != nil {
+		return nil, err
+	}
 
 	httpServer := &HTTPServer{
-		logger: SubLogger("http"),
-		// tmpl:     tmpl,
+		logger:   SubLogger("http"),
+		tmpl:     tmpl,
 		tmplData: &TMPLData{WSPort: wsPort},
 	}
 
@@ -42,14 +46,8 @@ func NewHTTPServer(port, wsPort int) (*HTTPServer, error) {
 }
 
 func (s *HTTPServer) DashboardHandler(w http.ResponseWriter, r *http.Request) {
-	tmpl, err := template.ParseFiles("./dashboard/index.html")
-	if err != nil {
-		// return nil, err
-	}
-
-	if err := tmpl.Execute(w, s.tmplData); err != nil {
-		// TODO don't panic pls
-		panic(err)
+	if err := s.tmpl.Execute(w, s.tmplData); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
 

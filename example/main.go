@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"net"
-	"os"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -37,10 +36,7 @@ func main() {
 	}()
 
 	log.Logger = log.
-		Output(zerolog.MultiLevelWriter(
-			&LoghellWriter{conn},
-			zerolog.ConsoleWriter{Out: os.Stdout},
-		)).
+		Output(&LoghellWriter{conn}).
 		Level(zerolog.DebugLevel)
 
 	for range time.Tick(*tick) {

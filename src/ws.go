@@ -42,22 +42,21 @@ func (s *WSServer) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		logger := s.logger.With().Str("addr", r.RemoteAddr).Logger()
 
-		ruleAsAString := r.URL.Query().Get("rule")
-		rule, err := NewRule(ruleAsAString)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			if _, err := w.Write([]byte(err.Error())); err != nil {
-				logger.Error().Err(err).Msg("write response error")
-			}
-			return
-		}
-
 		c, err := websocket.Accept(w, r, websocket.AcceptOptions{
 			InsecureSkipVerify: true,
 		})
 		if err != nil {
 			logger.Error().Err(err).Msg("accept connection error")
 			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		ruleAsAString := r.URL.Query().Get("rule")
+		rule, err := NewRule(ruleAsAString)
+		if err != nil {
+			if err := c.Close(4001, "was input invalid rule"); err != nil {
+				logger.Error().Err(err).Msg("close connection error")
+			}
 			return
 		}
 
