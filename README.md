@@ -5,7 +5,9 @@ Pretty simple log management tool
 
 ### Usage
 ```bash
-Usage of loghell
+Usage of loghell:
+  -http int
+    	set http server port (default 3033)
   -tcp int
     	set tcp server port (default 3031)
   -v	verbose output

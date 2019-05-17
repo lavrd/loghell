@@ -4,11 +4,11 @@ App sends logs every tick to loghell
 
 ### Usage
 ```bash
-Usage of main.go
+Usage of main.go:
   -e string
     	set loghell server endpoint (default "127.0.0.1:3031")
   -t duration
-    	set tick duration for send logs to loghell (default 500ms)
+    	set tick duration for send logs to loghell (default random ms)
 
 # start app
 $ go run main.go -e 127.0.0.1:3031 -t 2.5s
