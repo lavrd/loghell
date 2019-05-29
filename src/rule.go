@@ -79,8 +79,8 @@ func (r *Rule) parsePart(ruleAsAString string, start, end int) (*regexp.Regexp, 
 	return re, nil
 }
 
-func (r *Rule) Exec(log string) (string, error) {
-	excMarkRes := gojsonq.New().JSONString(log).Find(r.excMarkKey)
+func (r *Rule) Exec(logAsString string) (string, error) {
+	excMarkRes := gojsonq.New().JSONString(logAsString).Find(r.excMarkKey)
 	if excMarkRes == nil {
 		return "", ErrKeyNotFound(r.excMarkKey)
 	}
@@ -91,13 +91,13 @@ func (r *Rule) Exec(log string) (string, error) {
 		return "", ErrIncorrectTypeForRule
 	}
 
-	if !r.excMarkRe.MatchString(excMarkRes.(string)) || !r.atSignRe.MatchString(log) {
+	if !r.excMarkRe.MatchString(excMarkRes.(string)) || !r.atSignRe.MatchString(logAsString) {
 		return "", ErrNotMatched
 	}
 
-	s := r.atSignRe.FindString(log)
-	s = fmt.Sprintf(" <span class=\"highlighted\">%s</span>", s)
-	log = r.atSignRe.ReplaceAllString(log, s)
+	s := r.atSignRe.FindString(logAsString)
+	s = fmt.Sprintf("<span class=\"highlighted\">%s</span>", s)
+	logAsString = r.atSignRe.ReplaceAllString(logAsString, s)
 
-	return log, nil
+	return logAsString, nil
 }
