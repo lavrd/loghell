@@ -1,5 +1,9 @@
 # loghell
-Pretty simple log management tool
+Pretty simple log management tool. 
+You can connect you app and view only logs that you need.
+
+### Example
+![](./dashboard.png)
 
 ### [example app](./example/README.md)
 
