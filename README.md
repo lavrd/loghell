@@ -16,6 +16,11 @@ docker-compose up -d --build
 docker-compose down
 ```
 
+### Rule
+##### Example
+`!level=debug@example` - This rule takes logs with `level` field 
+which contains `debug` word and highlight `example` word in all logs.
+
 ### Usage
 ```bash
 Usage of loghell:

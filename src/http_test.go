@@ -25,7 +25,6 @@ func TestHTTPServer_DashboardHandler(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handler := http.HandlerFunc(httpServer.DashboardHandler)
 	handler.ServeHTTP(rr, req)
-
 	require.Equal(t, http.StatusOK, rr.Code)
 	require.Equal(t, "text/html; charset=utf-8", rr.Header().Get("content-type"))
 }

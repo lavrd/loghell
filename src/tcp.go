@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// TCPServer implements loghell tcp server
 type TCPServer struct {
 	port     int
 	ws       *WSServer
@@ -15,6 +16,7 @@ type TCPServer struct {
 	logger   zerolog.Logger
 }
 
+// NewTCPServer returns new tcp server
 func NewTCPServer(port int, ws *WSServer) *TCPServer {
 	return &TCPServer{
 		port:   port,
@@ -23,6 +25,7 @@ func NewTCPServer(port int, ws *WSServer) *TCPServer {
 	}
 }
 
+// Start start tcp server
 func (s *TCPServer) Start() error {
 	s.logger.Info().Msgf("starting server on port %d", s.port)
 
@@ -43,6 +46,7 @@ func (s *TCPServer) Start() error {
 	}
 }
 
+// Handler handle new tcp connections
 func (s *TCPServer) Handler(conn net.Conn, logger zerolog.Logger) {
 	logger.Debug().Msg("new connection")
 
@@ -69,6 +73,7 @@ func (s *TCPServer) Handler(conn net.Conn, logger zerolog.Logger) {
 	}
 }
 
+// Shutdown shutdown tcp server
 func (s *TCPServer) Shutdown() {
 	s.logger.Debug().Msg("shutdown server")
 	if err := s.listener.Close(); err != nil {
