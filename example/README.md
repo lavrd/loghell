@@ -1,6 +1,6 @@
-# example app
-This app shows how need use loghell \
-App sends logs every tick to loghell
+# Example app
+This app shows how need use loghell. \
+App sends logs every tick to loghell.
 
 ### Usage
 ```bash
