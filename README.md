@@ -5,7 +5,7 @@ You can connect you app and view only logs that you need.
 ### Example
 ![](./dashboard.png)
 
-### [Example app](./example/README.md)
+### [Example app](./example/)
 
 ### Docker usage
 ```bash
