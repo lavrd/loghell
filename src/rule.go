@@ -10,12 +10,12 @@ import (
 )
 
 var (
-	ErrInvalidRule              = func(rule string) error { return fmt.Errorf("invalid rule: %s", rule) }
-	ErrInvalidRulePartForRegexp = func(rulePart string) error { return fmt.Errorf("invalid rule part: %s", rulePart) }
-	ErrExcMarkShouldBeFirst     = errors.New("exclamation mark should be first at the rule")
-	ErrNotMatched               = errors.New("not matched")
-	ErrKeyNotFound              = func(key string) error { return fmt.Errorf("key not found: %s", key) }
-	ErrIncorrectTypeForRule     = errors.New("incorrect type for rule")
+	errInvalidRule              = func(rule string) error { return fmt.Errorf("invalid rule: %s", rule) }
+	errInvalidRulePartForRegexp = func(rulePart string) error { return fmt.Errorf("invalid rule part: %s", rulePart) }
+	errKeyNotFound              = func(key string) error { return fmt.Errorf("key not found: %s", key) }
+	errExcMarkShouldBeFirst     = errors.New("exclamation mark should be first at the rule")
+	errNotMatched               = errors.New("not matched")
+	errIncorrectTypeForRule     = errors.New("incorrect type for rule")
 )
 
 // Rule implements parse and exec loghell rules
@@ -34,12 +34,12 @@ func NewRule(ruleAsAString string) (*Rule, error) {
 
 	// rule should contain exclamation mark and at sign mark
 	if excMarkIndex == -1 || atSignMarkIndex == -1 {
-		return nil, ErrInvalidRule(ruleAsAString)
+		return nil, errInvalidRule(ruleAsAString)
 	}
 
 	// excMark should be greater then atSign and atSign is found
 	if excMarkIndex > atSignMarkIndex && atSignMarkIndex != -1 {
-		return nil, ErrExcMarkShouldBeFirst
+		return nil, errExcMarkShouldBeFirst
 	}
 
 	excMarkRule := ruleAsAString[excMarkIndex+1 : atSignMarkIndex]
@@ -48,7 +48,7 @@ func NewRule(ruleAsAString string) (*Rule, error) {
 	excMarkRuleSplit := strings.Split(excMarkRule, "=")
 
 	if len(excMarkRuleSplit) != 2 {
-		return nil, ErrInvalidRule(excMarkRule)
+		return nil, errInvalidRule(excMarkRule)
 	}
 
 	excMarkRuleLeft, excMarkRuleRight := excMarkRuleSplit[0], excMarkRuleSplit[1]
@@ -60,11 +60,11 @@ func NewRule(ruleAsAString string) (*Rule, error) {
 
 	rule.excMarkRe, err = regexp.Compile(excMarkRuleRight)
 	if err != nil {
-		return nil, ErrInvalidRulePartForRegexp(excMarkRuleRight)
+		return nil, errInvalidRulePartForRegexp(excMarkRuleRight)
 	}
 	rule.atSignRe, err = regexp.Compile(atSignMarkRule)
 	if err != nil {
-		return nil, ErrInvalidRulePartForRegexp(excMarkRuleRight)
+		return nil, errInvalidRulePartForRegexp(excMarkRuleRight)
 	}
 
 	return rule, nil
@@ -75,7 +75,7 @@ func (r *Rule) parsePart(ruleAsAString string, start, end int) (*regexp.Regexp, 
 
 	re, err := regexp.Compile(rulePart)
 	if err != nil {
-		return nil, ErrInvalidRulePartForRegexp(rulePart)
+		return nil, errInvalidRulePartForRegexp(rulePart)
 	}
 
 	return re, nil
@@ -85,17 +85,17 @@ func (r *Rule) parsePart(ruleAsAString string, start, end int) (*regexp.Regexp, 
 func (r *Rule) Exec(logAsString string) (string, error) {
 	excMarkRes := gojsonq.New().JSONString(logAsString).Find(r.excMarkKey)
 	if excMarkRes == nil {
-		return "", ErrKeyNotFound(r.excMarkKey)
+		return "", errKeyNotFound(r.excMarkKey)
 	}
 
 	switch excMarkRes.(type) {
 	case string:
 	default:
-		return "", ErrIncorrectTypeForRule
+		return "", errIncorrectTypeForRule
 	}
 
 	if !r.excMarkRe.MatchString(excMarkRes.(string)) || !r.atSignRe.MatchString(logAsString) {
-		return "", ErrNotMatched
+		return "", errNotMatched
 	}
 
 	s := r.atSignRe.FindString(logAsString)
