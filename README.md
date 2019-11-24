@@ -6,7 +6,9 @@ You can connect you app and view only logs that you need.
 ![](./dashboard.png)
 
 ### [Example app](./example/)
-### [Zerolog writer](./writer/zerolog.go)
+
+### Writers
+- [Zerolog](./writer/zerolog.go)
 
 ### Docker usage
 ```bash
