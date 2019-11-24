@@ -10,12 +10,12 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// TMPLData describe template data for dashboard
+// TMPLData describe template data for dashboard.
 type TMPLData struct {
 	WSPort int
 }
 
-// HTTPServer implements loghell http server
+// HTTPServer implements loghell http server.
 type HTTPServer struct {
 	logger   zerolog.Logger
 	srv      *http.Server
@@ -23,7 +23,7 @@ type HTTPServer struct {
 	tmplData *TMPLData
 }
 
-// NewHTTPServer returns new http server
+// NewHTTPServer returns new http server.
 func NewHTTPServer(port, wsPort int) (*HTTPServer, error) {
 	tmpl, err := template.ParseFiles("./dashboard/index.html")
 	if err != nil {
@@ -48,20 +48,20 @@ func NewHTTPServer(port, wsPort int) (*HTTPServer, error) {
 	return httpServer, nil
 }
 
-// DashboardHandler dashboard handler
+// DashboardHandler dashboard handler.
 func (s *HTTPServer) DashboardHandler(w http.ResponseWriter, r *http.Request) {
 	if err := s.tmpl.Execute(w, s.tmplData); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
 
-// Start start http server
+// Start start http server.
 func (s *HTTPServer) Start() error {
 	s.logger.Info().Msgf("starting server on %s", s.srv.Addr)
 	return s.srv.ListenAndServe()
 }
 
-// Shutdown shutdown http server
+// Shutdown shutdown http server.
 func (s *HTTPServer) Shutdown() {
 	s.logger.Debug().Msg("shutdown server")
 

@@ -18,26 +18,26 @@ var (
 	errIncorrectTypeForRule     = errors.New("incorrect type for rule")
 )
 
-// Rule implements parse and exec loghell rules
+// Rule implements parse and exec loghell rules.
 type Rule struct {
 	atSignRe   *regexp.Regexp
 	excMarkRe  *regexp.Regexp
 	excMarkKey string
 }
 
-// NewRule returns new rule
+// NewRule returns new rule.
 func NewRule(ruleAsAString string) (*Rule, error) {
-	// looking for exclamation mark in rule string
+	// looking for exclamation mark in rule string.
 	excMarkIndex := strings.Index(ruleAsAString, "!")
-	// looking for atSign mark in rule string
+	// looking for atSign mark in rule string.
 	atSignMarkIndex := strings.Index(ruleAsAString, "@")
 
-	// rule should contain exclamation mark and at sign mark
+	// rule should contain exclamation mark and at sign mark.
 	if excMarkIndex == -1 || atSignMarkIndex == -1 {
 		return nil, errInvalidRule(ruleAsAString)
 	}
 
-	// excMark should be greater then atSign and atSign is found
+	// excMark should be greater then atSign and atSign is found.
 	if excMarkIndex > atSignMarkIndex && atSignMarkIndex != -1 {
 		return nil, errExcMarkShouldBeFirst
 	}
@@ -81,7 +81,7 @@ func (r *Rule) parsePart(ruleAsAString string, start, end int) (*regexp.Regexp, 
 	return re, nil
 }
 
-// Exec exec parsed rule
+// Exec exec parsed rule.
 func (r *Rule) Exec(logAsString string) (string, error) {
 	excMarkRes := gojsonq.New().JSONString(logAsString).Find(r.excMarkKey)
 	if excMarkRes == nil {

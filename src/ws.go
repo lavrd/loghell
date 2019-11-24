@@ -18,14 +18,14 @@ type conn struct {
 	logger zerolog.Logger
 }
 
-// WSServer implement loghell websocket server
+// WSServer implement loghell websocket server.
 type WSServer struct {
 	conns  map[string]*conn
 	srv    *http.Server
 	logger zerolog.Logger
 }
 
-// NewWSServer returns new websocket server
+// NewWSServer returns new websocket server.
 func NewWSServer(port int) *WSServer {
 	wss := &WSServer{
 		conns:  make(map[string]*conn),
@@ -40,7 +40,7 @@ func NewWSServer(port int) *WSServer {
 	return wss
 }
 
-// Handler handle new websocket connections
+// Handler handle new websocket connections.
 func (s *WSServer) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		logger := s.logger.With().Str("addr", r.RemoteAddr).Logger()
@@ -85,13 +85,13 @@ func (s *WSServer) Handler() http.Handler {
 	})
 }
 
-// Start start websocket server
+// Start start websocket server.
 func (s *WSServer) Start() error {
 	s.logger.Info().Msgf("starting server on %s", s.srv.Addr)
 	return s.srv.ListenAndServe()
 }
 
-// Shutdown shutdown websocket server
+// Shutdown shutdown websocket server.
 func (s *WSServer) Shutdown() {
 	s.logger.Debug().Msg("shutdown server")
 
@@ -109,7 +109,7 @@ func (s *WSServer) Shutdown() {
 	}
 }
 
-// PrepareAndSend prepare new log message and send it to websocket connection
+// PrepareAndSend prepare new log message and send it to websocket connection.
 func (s *WSServer) PrepareAndSend(log string) {
 	s.logger.Debug().Msgf("send message to clients | %s", log)
 
