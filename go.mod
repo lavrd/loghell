@@ -3,12 +3,10 @@ module loghell
 go 1.13
 
 require (
+	github.com/blevesearch/bleve/v2 v2.1.0
 	github.com/rs/zerolog v1.14.3
-	github.com/stretchr/testify v1.3.0
+	github.com/stretchr/testify v1.4.0
 	github.com/thedevsaddam/gojsonq v2.2.1+incompatible
-	golang.org/x/net v0.0.0-20190424112056-4829fb13d2c6 // indirect
 	golang.org/x/text v0.3.2 // indirect
-	golang.org/x/tools v0.0.0-20190429184909-35c670923e21 // indirect
-	golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898 // indirect
 	nhooyr.io/websocket v0.2.0
 )
