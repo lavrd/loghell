@@ -1,6 +1,6 @@
 use env_logger::Env;
+use log::{debug, error};
 use std::env;
-use log::error;
 
 mod daemon;
 
@@ -22,7 +22,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tokio::spawn(async move {
         match daemon::Daemon::new(socket_addr).start().await {
-            Ok(_) => {}
+            Ok(_) => debug!("daemon stopped successfully"),
             Err(e) => {
                 error!("failed to start daemon : {}", e);
                 std::process::exit(ExitCode::FailedToStartDaemon as i32);
@@ -31,6 +31,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     tokio::signal::ctrl_c().await?;
+
+    // std::thread::sleep(std::time::Duration::from_secs(1));
 
     Ok(())
 }
