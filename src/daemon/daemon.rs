@@ -27,7 +27,7 @@ impl Daemon {
         }
     }
 
-    pub async fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn start(&self) -> Result<(), Box<dyn std::error::Error>> {
         let listener = TcpListener::bind(&self.socket_addr).await?;
         let local_addr = listener.local_addr()?;
         info!("socket start at {}", local_addr);
@@ -39,11 +39,12 @@ impl Daemon {
         }
     }
 
-    async fn fff(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn fff(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let mut rx = self.rx.clone();
         tokio::spawn(async move {
-            println!(">>>");
-            self.rx.changed().await.unwrap();
-            println!(">>>");
+            println!("!!!");
+            rx.changed().await.is_ok();
+            println!(")))");
         });
         Ok(())
     }
