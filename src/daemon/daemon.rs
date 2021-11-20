@@ -59,3 +59,7 @@ impl Daemon {
         }
     }
 }
+
+impl Drop for Daemon {
+    fn drop(&mut self) {}
+}
