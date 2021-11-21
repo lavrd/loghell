@@ -1,160 +1,196 @@
-use log::{debug, error, info};
-use std::str::{from_utf8, Utf8Error};
-use tokio::io::AsyncReadExt;
+use log::{debug, error, info, trace};
+use std::net::SocketAddr;
+use std::str::from_utf8;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::watch;
 
-// TODO: Waiting while all loops will be stopped by channels!
-
-enum ProcessDataEvent {
+enum ProcessDataResult {
+    Ok,
     Close,
-    Error(Utf8Error),
 }
 
 pub struct Daemon {
     socket_addr: String,
-    tx: watch::Sender<bool>,
-    rx: watch::Receiver<bool>,
 }
 
 impl Daemon {
     pub fn new(socket_addr: String) -> Self {
-        let (tx, mut rx) = watch::channel(true);
-        Daemon {
-            socket_addr,
-            tx,
-            rx,
-        }
+        Daemon { socket_addr }
     }
 
-    pub async fn start(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn start(
+        &self,
+        shutdown_rx: watch::Receiver<()>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let listener = TcpListener::bind(&self.socket_addr).await?;
+        /*
+           We get local address from listener instead of use from &self
+            because of we can pass local address with zero port which can be selected randomly.
+        */
         let local_addr = listener.local_addr()?;
-        info!("socket start at {}", local_addr);
+        info!("socket starts at : {}", local_addr);
 
-        loop {
-            let socket = listener.accept().await?;
-            // tokio::spawn(process_socket(socket.0, self.rx.clone()));
-            self.fff().await?;
+        let mut _shutdown_rx = shutdown_rx.clone();
+        tokio::select! {
+            res = self.accept(listener, shutdown_rx.clone()) => { res }
+            _ = _shutdown_rx.changed() => {
+                debug!("terminating accept new clients loop");
+                Ok(())
+            }
         }
     }
 
-    async fn fff(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let mut rx = self.rx.clone();
-        tokio::spawn(async move {
-            println!("!!!");
-            rx.changed().await.is_ok();
-            println!(")))");
-        });
-        Ok(())
+    async fn accept(
+        &self,
+        listener: TcpListener,
+        shutdown_rx: watch::Receiver<()>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        loop {
+            let (socket, socket_addr) = listener.accept().await?;
+            info!("new client; ip : {}", socket_addr);
+
+            let _shutdown_rx = shutdown_rx.clone();
+            tokio::spawn(async move {
+                trace!("spawn thread for {} client", socket_addr);
+                let mut handler = Handler {
+                    socket,
+                    socket_addr,
+                    shutdown_rx: _shutdown_rx.clone(),
+                };
+                handler.process_socket().await;
+                trace!(
+                    "moving from spawn in accept loop for {} client",
+                    socket_addr
+                );
+            });
+        }
     }
 }
 
 impl Drop for Daemon {
     fn drop(&mut self) {
-        println!("drop used");
-        self.tx.send(true).unwrap();
-        std::thread::sleep(std::time::Duration::from_secs(1));
-        println!(">>>")
+        trace!("dropping Daemon")
     }
 }
 
-async fn process_socket(mut socket: TcpStream, mut rx: watch::Receiver<bool>) {
-    let socket_addr = socket.local_addr().unwrap();
-    debug!("new client from {}", socket_addr);
+struct Handler {
+    socket: TcpStream,
+    socket_addr: SocketAddr,
+    shutdown_rx: watch::Receiver<()>,
+}
 
-    // let data = poll_fn(|cx| {
-    //     let mut buf = [0; 1024];
-    //     let mut buf = ReadBuf::new(&mut buf);
-    //
-    //     match socket.poll_peek(cx, &mut buf) {
-    //         Poll::Pending => Poll::Pending,
-    //         Poll::Ready(Ok((buf))) => Poll::Ready(Ok(buf)),
-    //         Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
-    //     }
-    // }).await.unwrap();
-    //
-    // let (tx, rx) = tokio::sync::oneshot::channel();
-    // tx.send(());
-    //
-
-    tokio::select! {
-        _ = async {
-            loop {
-                let mut buf = [0; 1024];
-                let n = socket.read(&mut buf).await.unwrap();
-                match process_data(n, &buf[0..n], socket_addr.to_string().as_str()) {
-                    None => debug!("lll"),
-                    Some(ProcessDataEvent::Close) => {
-                        debug!("123");
-                        return
-                    },
-                    Some(ProcessDataEvent::Error(e)) => error!("failed to process data : {}", e)
-                };
+impl Handler {
+    async fn process_socket(&mut self) {
+        let mut _shutdown_rx = self.shutdown_rx.clone();
+        tokio::select! {
+            res = self.read_data() => {
+                match res {
+                    None => debug!("connection with {} client closed successfully", self.socket_addr),
+                    Some(e) => error!("failed to read data from socket; client : {}; : {}", self.socket_addr, e)
+                }
             }
-        } => {}
-        _ = rx.changed() => {
-            println!("terminating accept loop");
-            return
+            _ = _shutdown_rx.changed() => {
+                trace!("terminating read data loop; client : {}", self.socket_addr);
+            }
         }
+
+        match self.socket.shutdown().await {
+            Ok(()) => trace!("successfully shutdown {} socket", self.socket_addr),
+            Err(e) => {
+                error!(
+                    "failed to shutdown socket with {} address : {}",
+                    self.socket_addr, e
+                )
+            }
+        }
+
+        trace!("we have moved from select in Handler.process_socket");
     }
 
-    // loop {
-    //     let n = match socket.read(&mut buf).await {
-    //         Ok(n) if n == 0 => {
-    //             debug!("connection with {} socket closed", socket_addr);
-    //             return;
-    //         }
-    //         Ok(n) if n == 5 && buf[0..n] == [255, 244, 255, 253, 6] => {
-    //             debug!("telnet connection with {} socket closed", socket_addr);
-    //             return;
-    //         }
-    //         Ok(n) => {
-    //             // We use n-2 to remove /r/n.
-    //             let data = match from_utf8(&buf[0..n - 2]) {
-    //                 Ok(data) => data,
-    //                 Err(e) => {
-    //                     error!("failed to convert incoming data to string : {}", e);
-    //                     return;
-    //                 }
-    //             };
-    //             debug!("new data from {} : {:?}", socket_addr, data);
-    //             n
-    //         }
-    //         Err(e) => {
-    //             error!("failed to read from socket; err : {:?}", e);
-    //             0
-    //         }
-    //     };
-    //
-    //     if let Err(e) = socket.write_all(&buf[0..n]).await {
-    //         error!("failed to write to socket; err : {:?}", e);
-    //         return;
-    //     }
-    // };
-}
-
-fn process_data(n: usize, buf: &[u8], socket_addr: &str) -> Option<ProcessDataEvent> {
-    match n {
-        n if n == 0 => {
-            debug!("connection with {} socket closed", socket_addr);
-            Some(ProcessDataEvent::Close)
-        }
-        // n if n == 5 && buf[0..n] == [255, 244, 255, 253, 6] => {
-        //     debug!("telnet connection with {} socket closed", socket_addr);
-        //     None
-        // }
-        n => {
-            // We use n-2 to remove /r/n.
-            let data = match from_utf8(&buf[0..n - 2]) {
-                Ok(data) => data,
+    async fn read_data(&mut self) -> Option<Box<dyn std::error::Error>> {
+        loop {
+            let mut buf = [0; 1024];
+            // Read data from socket.
+            let n = match self.socket.read(&mut buf).await {
+                Ok(n) => {
+                    trace!("read {} bytes from {} client", n, self.socket_addr);
+                    n
+                }
                 Err(e) => {
-                    error!("failed to convert incoming data to string : {}", e);
-                    return Some(ProcessDataEvent::Error(e));
+                    error!("failed to read data from {} client", self.socket_addr);
+                    return Some(e.to_string().into());
                 }
             };
-            debug!("new data from {} : {:?}", socket_addr, data);
-            None
+            match self.process_data(n, &buf) {
+                Ok(ProcessDataResult::Ok) => {
+                    trace!(
+                        "data from {} client successfully proceeded",
+                        self.socket_addr
+                    );
+                    // Read next frame from socket.
+                    continue;
+                }
+                Ok(ProcessDataResult::Close) => {
+                    trace!("close connection with {} client", self.socket_addr);
+                    // Go away from read loop to close connection with client.
+                    return None;
+                }
+                Err(e) => {
+                    error!(
+                        "failed to process data from {} client: {}",
+                        self.socket_addr, e
+                    );
+                    return Some(e);
+                }
+            };
         }
+    }
+
+    fn process_data(
+        &self,
+        n: usize,
+        buf: &[u8],
+    ) -> Result<ProcessDataResult, Box<dyn std::error::Error>> {
+        match n {
+            n if n == 0 => {
+                trace!("connection with {} client closed", self.socket_addr);
+                Ok(ProcessDataResult::Close)
+            }
+            n if n == 5 && buf[0..n] == [255, 244, 255, 253, 6] => {
+                trace!(
+                    "connection with {} client closed (ctrl+c by telnet client)",
+                    self.socket_addr
+                );
+                Ok(ProcessDataResult::Close)
+            }
+            n => {
+                // TODO: This is tested only with telnet client.
+                // We use n-2 to remove /r/n.
+                let truncated_buf: &[u8] = &buf[0..n - 2];
+                // Convert bytes to string.
+                let data = match from_utf8(truncated_buf) {
+                    Ok(data) => data,
+                    Err(e) => {
+                        error!(
+                            "failed to convert incoming data to string; err : {}; data : {:?}",
+                            e, truncated_buf
+                        );
+                        return Err(e.to_string().into());
+                    }
+                };
+                info!(
+                    "new data received from {} client : {:?}",
+                    self.socket_addr, data
+                );
+                Ok(ProcessDataResult::Ok)
+            }
+        }
+    }
+}
+
+impl Drop for Handler {
+    fn drop(&mut self) {
+        trace!("dropping Handler for {} client", self.socket_addr)
     }
 }
