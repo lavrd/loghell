@@ -1,4 +1,4 @@
-use env_logger::Env;
+use env_logger::{Builder, Env};
 use log::{debug, error, info};
 use std::env;
 
@@ -18,15 +18,15 @@ enum ExitCode {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    env_logger::Builder::from_env(Env::default().default_filter_or(DEFAULT_LOG_LEVEL)).init();
+    Builder::from_env(Env::default().default_filter_or(DEFAULT_LOG_LEVEL)).init();
 
     let socket_addr = env::var(ENV_SOCKET_ADDR).unwrap_or_else(|_| DEFAULT_SOCKET_ADDR.to_string());
 
-    let daemon = daemon::Daemon::new(socket_addr);
+    let server = daemon::Server::new(socket_addr);
     let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(());
 
     tokio::spawn(async move {
-        match daemon.start(shutdown_rx).await {
+        match server.start(shutdown_rx).await {
             Ok(()) => debug!("daemon has been stopped successfully"),
             Err(e) => {
                 error!("failed to start daemon : {}", e);
@@ -44,7 +44,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tokio::select! {
         _ = &mut timeout => {
             error!("daemon stopping is timed out");
-            std::process::exit(ExitCode::FailedToStopDaemon as    i32);
+            std::process::exit(ExitCode::FailedToStopDaemon as i32);
         }
         _ = shutdown_tx.closed() => {
             debug!("daemon successfully stopped");

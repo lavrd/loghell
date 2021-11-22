@@ -1,6 +1,6 @@
+use crate::daemon::tcp::TCPHandler;
 use log::{debug, error, info, trace};
 use std::net::SocketAddr;
-use std::str::from_utf8;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::watch;
@@ -10,13 +10,13 @@ enum ProcessDataResult {
     Close,
 }
 
-pub struct Daemon {
+pub struct Server {
     socket_addr: String,
 }
 
-impl Daemon {
+impl Server {
     pub fn new(socket_addr: String) -> Self {
-        Daemon { socket_addr }
+        Server { socket_addr }
     }
 
     pub async fn start(
@@ -68,7 +68,7 @@ impl Daemon {
     }
 }
 
-impl Drop for Daemon {
+impl Drop for Server {
     fn drop(&mut self) {
         trace!("dropping Daemon")
     }
@@ -168,22 +168,14 @@ impl Handler {
                 // TODO: This is tested only with telnet client.
                 // We use n-2 to remove /r/n.
                 let truncated_buf: &[u8] = &buf[0..n - 2];
-                // Convert bytes to string.
-                let data = match from_utf8(truncated_buf) {
-                    Ok(data) => data,
-                    Err(e) => {
-                        error!(
-                            "failed to convert incoming data to string; err : {}; data : {:?}",
-                            e, truncated_buf
-                        );
-                        return Err(e.to_string().into());
-                    }
-                };
-                info!(
-                    "new data received from {} client : {:?}",
-                    self.socket_addr, data
-                );
-                Ok(ProcessDataResult::Ok)
+
+                // TODO: TCP or HTTP handler.
+
+                let handler = TCPHandler::new(truncated_buf, self.socket_addr);
+                match handler.handle() {
+                    None => Ok(ProcessDataResult::Ok),
+                    Some(e) => Err(e.to_string().into()),
+                }
             }
         }
     }
