@@ -1,5 +1,6 @@
 use std::net::SocketAddr;
-use std::sync::Arc;
+use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use log::{debug, error, info, trace};
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufWriter};
@@ -58,11 +59,8 @@ impl Server {
             let _shutdown_rx = shutdown_rx.clone();
             tokio::spawn(async move {
                 trace!("spawn thread for {} client", socket_addr);
-                let mut connection = Connection {
-                    socket,
-                    socket_addr,
-                    shutdown_rx: _shutdown_rx.clone(),
-                }; // TODO: Try to move outside spawn.
+                // TODO: Try to move outside spawn.
+                let mut connection = Connection::new(socket, socket_addr, _shutdown_rx);
                 connection.process_socket().await;
                 trace!(
                     "moving from spawn in accept loop for {} client",
@@ -83,9 +81,22 @@ struct Connection {
     socket: TcpStream,
     socket_addr: SocketAddr,
     shutdown_rx: watch::Receiver<()>,
+    http_handler: Arc<HTTP>,
+    tcp_handler: Arc<TCP>,
 }
 
 impl Connection {
+    fn new(socket: TcpStream, socket_addr: SocketAddr, shutdown_rx: watch::Receiver<()>) -> Self {
+        let _shutdown_rx = shutdown_rx.clone();
+        Connection {
+            socket,
+            socket_addr,
+            shutdown_rx: _shutdown_rx,
+            http_handler: Arc::new(HTTP::new(socket_addr)),
+            tcp_handler: Arc::new(TCP::new(socket_addr)),
+        }
+    }
+
     async fn process_socket(&mut self) {
         let mut _shutdown_rx = self.shutdown_rx.clone();
         tokio::select! {
@@ -175,18 +186,9 @@ impl Connection {
                 // We use n-2 to remove /r/n.
                 let truncated_buf: &[u8] = &buf[0..n - 2];
 
-                // let writer = tokio::io::BufWriter::new(send);
-                // let writer = Box::new(writer);
-                // send.wri
-
-                // let wr = BufWriter::new(&self.socket);
-
-                let (_, send) = self.socket.split();
-                let writer = Box::new(send);
-
-                let handler: Box<dyn Handler> = match &truncated_buf[0..14] {
-                    b"GET / HTTP/1.1" => Box::new(HTTP::new(self.socket_addr, writer)),
-                    _ => Box::new(TCP::new(self.socket_addr))
+                let handler: Arc<dyn Handler> = match truncated_buf {
+                    truncated_buf if truncated_buf.len() >= 14 && &truncated_buf[0..14] == b"GET / HTTP/1.1" => self.http_handler.clone(),
+                    _ => self.tcp_handler.clone(),
                 };
 
                 match handler.handle(truncated_buf) {

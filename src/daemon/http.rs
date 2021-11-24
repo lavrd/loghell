@@ -7,16 +7,14 @@ use tokio::net::TcpStream;
 
 use crate::daemon::handler::Handler;
 
+// TODO: Rename.
 pub struct HTTP {
     socket_addr: SocketAddr,
-    writer: Box<dyn AsyncWrite>,
 }
 
 impl HTTP {
-    pub fn new(
-        socket_addr: SocketAddr, writer: Box<dyn AsyncWrite>,
-    ) -> Self {
-        HTTP { socket_addr, writer }
+    pub fn new(socket_addr: SocketAddr) -> Self {
+        HTTP { socket_addr }
     }
 }
 

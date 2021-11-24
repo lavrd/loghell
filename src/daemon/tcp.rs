@@ -5,12 +5,15 @@ use log::{error, info};
 
 use crate::daemon::handler::Handler;
 
+// TODO: Rename.
 pub struct TCP {
     socket_addr: SocketAddr,
 }
 
 impl TCP {
-    pub fn new(socket_addr: SocketAddr) -> Self { TCP { socket_addr } }
+    pub fn new(socket_addr: SocketAddr) -> Self {
+        TCP { socket_addr }
+    }
 }
 
 impl Handler for TCP {
