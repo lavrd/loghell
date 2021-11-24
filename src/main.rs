@@ -1,6 +1,7 @@
+use std::env;
+
 use env_logger::{Builder, Env};
 use log::{debug, error, info};
-use std::env;
 
 mod daemon;
 

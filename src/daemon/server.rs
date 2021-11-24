@@ -1,9 +1,14 @@
-use crate::daemon::tcp::TCPHandler;
-use log::{debug, error, info, trace};
 use std::net::SocketAddr;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use std::sync::Arc;
+
+use log::{debug, error, info, trace};
+use tokio::io::{AsyncReadExt, AsyncWriteExt, BufWriter};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::watch;
+
+use crate::daemon::handler::Handler;
+use crate::daemon::http::HTTP;
+use crate::daemon::tcp::TCP;
 
 enum ProcessDataResult {
     Ok,
@@ -53,12 +58,12 @@ impl Server {
             let _shutdown_rx = shutdown_rx.clone();
             tokio::spawn(async move {
                 trace!("spawn thread for {} client", socket_addr);
-                let mut handler = Handler {
+                let mut connection = Connection {
                     socket,
                     socket_addr,
                     shutdown_rx: _shutdown_rx.clone(),
-                };
-                handler.process_socket().await;
+                }; // TODO: Try to move outside spawn.
+                connection.process_socket().await;
                 trace!(
                     "moving from spawn in accept loop for {} client",
                     socket_addr
@@ -74,13 +79,13 @@ impl Drop for Server {
     }
 }
 
-struct Handler {
+struct Connection {
     socket: TcpStream,
     socket_addr: SocketAddr,
     shutdown_rx: watch::Receiver<()>,
 }
 
-impl Handler {
+impl Connection {
     async fn process_socket(&mut self) {
         let mut _shutdown_rx = self.shutdown_rx.clone();
         tokio::select! {
@@ -105,7 +110,7 @@ impl Handler {
             }
         }
 
-        trace!("we have moved from select in Handler.process_socket");
+        trace!("we have moved from select in Connection.process_socket");
     }
 
     async fn read_data(&mut self) -> Option<Box<dyn std::error::Error>> {
@@ -148,7 +153,7 @@ impl Handler {
     }
 
     fn process_data(
-        &self,
+        &mut self,
         n: usize,
         buf: &[u8],
     ) -> Result<ProcessDataResult, Box<dyn std::error::Error>> {
@@ -166,13 +171,25 @@ impl Handler {
             }
             n => {
                 // TODO: This is tested only with telnet client.
+                // TODO: May be we should move it to tcp handler only?
                 // We use n-2 to remove /r/n.
                 let truncated_buf: &[u8] = &buf[0..n - 2];
 
-                // TODO: TCP or HTTP handler.
+                // let writer = tokio::io::BufWriter::new(send);
+                // let writer = Box::new(writer);
+                // send.wri
 
-                let handler = TCPHandler::new(truncated_buf, self.socket_addr);
-                match handler.handle() {
+                // let wr = BufWriter::new(&self.socket);
+
+                let (_, send) = self.socket.split();
+                let writer = Box::new(send);
+
+                let handler: Box<dyn Handler> = match &truncated_buf[0..14] {
+                    b"GET / HTTP/1.1" => Box::new(HTTP::new(self.socket_addr, writer)),
+                    _ => Box::new(TCP::new(self.socket_addr))
+                };
+
+                match handler.handle(truncated_buf) {
                     None => Ok(ProcessDataResult::Ok),
                     Some(e) => Err(e.to_string().into()),
                 }
@@ -181,8 +198,8 @@ impl Handler {
     }
 }
 
-impl Drop for Handler {
+impl Drop for Connection {
     fn drop(&mut self) {
-        trace!("dropping Handler for {} client", self.socket_addr)
+        trace!("dropping Connection for {} client", self.socket_addr)
     }
 }
