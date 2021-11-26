@@ -1,6 +1,6 @@
 pub use server::Server;
 
+mod dashboard;
 mod handler;
-mod http;
 mod server;
 mod tcp;

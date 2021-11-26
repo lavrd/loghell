@@ -5,7 +5,7 @@ use log::{error, info};
 
 use crate::daemon::handler::Handler;
 
-// TODO: Rename.
+// TODO: Rename. Something with logs handler.
 pub struct TCP {
     socket_addr: SocketAddr,
 }
@@ -17,7 +17,7 @@ impl TCP {
 }
 
 impl Handler for TCP {
-    fn handle(&self, buf: &[u8]) -> Option<Box<dyn std::error::Error>> {
+    fn handle(&mut self, buf: &[u8]) -> Option<Box<dyn std::error::Error>> {
         // Convert bytes to string.
         let data = match from_utf8(buf) {
             Ok(data) => data,

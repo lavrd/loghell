@@ -1,3 +1,3 @@
 pub trait Handler {
-    fn handle(&self, buf: &[u8]) -> Option<Box<dyn std::error::Error>>;
+    fn handle(&mut self, buf: &[u8]) -> Option<Box<dyn std::error::Error>>;
 }

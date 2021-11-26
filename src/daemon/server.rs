@@ -1,14 +1,14 @@
 use std::net::SocketAddr;
-use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use log::{debug, error, info, trace};
-use tokio::io::{AsyncReadExt, AsyncWriteExt, BufWriter};
+use tokio::io::AsyncReadExt;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::watch;
+use tokio::net::tcp::OwnedReadHalf;
+use tokio::sync::{Mutex, watch};
 
+use crate::daemon::dashboard::Dashboard;
 use crate::daemon::handler::Handler;
-use crate::daemon::http::HTTP;
 use crate::daemon::tcp::TCP;
 
 enum ProcessDataResult {
@@ -78,22 +78,23 @@ impl Drop for Server {
 }
 
 struct Connection {
-    socket: TcpStream,
+    reader: OwnedReadHalf,
     socket_addr: SocketAddr,
     shutdown_rx: watch::Receiver<()>,
-    http_handler: Arc<HTTP>,
-    tcp_handler: Arc<TCP>,
+    http_handler: Arc<Mutex<Dashboard>>,
+    tcp_handler: Arc<Mutex<TCP>>,
 }
 
 impl Connection {
     fn new(socket: TcpStream, socket_addr: SocketAddr, shutdown_rx: watch::Receiver<()>) -> Self {
+        let (reader, writer) = socket.into_split();
         let _shutdown_rx = shutdown_rx.clone();
         Connection {
-            socket,
+            reader,
             socket_addr,
             shutdown_rx: _shutdown_rx,
-            http_handler: Arc::new(HTTP::new(socket_addr)),
-            tcp_handler: Arc::new(TCP::new(socket_addr)),
+            http_handler: Arc::new(Mutex::new(Dashboard::new(socket_addr, writer))),
+            tcp_handler: Arc::new(Mutex::new(TCP::new(socket_addr))),
         }
     }
 
@@ -111,15 +112,16 @@ impl Connection {
             }
         }
 
-        match self.socket.shutdown().await {
-            Ok(()) => trace!("successfully shutdown {} socket", self.socket_addr),
-            Err(e) => {
-                error!(
-                    "failed to shutdown socket with {} address : {}",
-                    self.socket_addr, e
-                )
-            }
-        }
+        // TODO: How to shutdown obviosly?
+        // match self.socket.shutdown().await {
+        //     Ok(()) => trace!("successfully shutdown {} socket", self.socket_addr),
+        //     Err(e) => {
+        //         error!(
+        //             "failed to shutdown socket with {} address : {}",
+        //             self.socket_addr, e
+        //         )
+        //     }
+        // }
 
         trace!("we have moved from select in Connection.process_socket");
     }
@@ -128,7 +130,7 @@ impl Connection {
         loop {
             let mut buf = [0; 1024];
             // Read data from socket.
-            let n = match self.socket.read(&mut buf).await {
+            let n = match self.reader.read(&mut buf).await {
                 Ok(n) => {
                     trace!("read {} bytes from {} client", n, self.socket_addr);
                     n
@@ -138,7 +140,7 @@ impl Connection {
                     return Some(e.to_string().into());
                 }
             };
-            match self.process_data(n, &buf) {
+            match self.process_data(n, &buf).await {
                 Ok(ProcessDataResult::Ok) => {
                     trace!(
                         "data from {} client successfully proceeded",
@@ -163,7 +165,7 @@ impl Connection {
         }
     }
 
-    fn process_data(
+    async fn process_data(
         &mut self,
         n: usize,
         buf: &[u8],
@@ -186,12 +188,19 @@ impl Connection {
                 // We use n-2 to remove /r/n.
                 let truncated_buf: &[u8] = &buf[0..n - 2];
 
-                let handler: Arc<dyn Handler> = match truncated_buf {
-                    truncated_buf if truncated_buf.len() >= 14 && &truncated_buf[0..14] == b"GET / HTTP/1.1" => self.http_handler.clone(),
+                let handler: Arc<Mutex<dyn Handler>> = match truncated_buf {
+                    truncated_buf
+                    if truncated_buf.len() >= 14
+                        && &truncated_buf[0..14] == b"GET / HTTP/1.1" =>
+                        {
+                            self.http_handler.clone()
+                        }
                     _ => self.tcp_handler.clone(),
                 };
 
-                match handler.handle(truncated_buf) {
+                let mut bh = handler.try_lock().unwrap();
+
+                match bh.handle(truncated_buf) {
                     None => Ok(ProcessDataResult::Ok),
                     Some(e) => Err(e.to_string().into()),
                 }
