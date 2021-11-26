@@ -1,15 +1,12 @@
+use std::error::Error;
+use std::fs;
 use std::net::SocketAddr;
-use std::sync::Arc;
+use std::str::from_utf8;
 
 use log::{debug, error, info, trace};
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::net::tcp::OwnedReadHalf;
-use tokio::sync::{Mutex, watch};
-
-use crate::daemon::dashboard::Dashboard;
-use crate::daemon::handler::Handler;
-use crate::daemon::tcp::TCP;
+use tokio::sync::watch;
 
 enum ProcessDataResult {
     Ok,
@@ -25,10 +22,7 @@ impl Server {
         Server { socket_addr }
     }
 
-    pub async fn start(
-        &self,
-        shutdown_rx: watch::Receiver<()>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn start(&self, shutdown_rx: watch::Receiver<()>) -> Result<(), Box<dyn Error>> {
         let listener = TcpListener::bind(&self.socket_addr).await?;
         /*
            We get local address from listener instead of use from &self
@@ -51,7 +45,7 @@ impl Server {
         &self,
         listener: TcpListener,
         shutdown_rx: watch::Receiver<()>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn Error>> {
         loop {
             let (socket, socket_addr) = listener.accept().await?;
             info!("new client; ip : {}", socket_addr);
@@ -78,23 +72,17 @@ impl Drop for Server {
 }
 
 struct Connection {
-    reader: OwnedReadHalf,
+    socket: TcpStream,
     socket_addr: SocketAddr,
     shutdown_rx: watch::Receiver<()>,
-    http_handler: Arc<Mutex<Dashboard>>,
-    tcp_handler: Arc<Mutex<TCP>>,
 }
 
 impl Connection {
     fn new(socket: TcpStream, socket_addr: SocketAddr, shutdown_rx: watch::Receiver<()>) -> Self {
-        let (reader, writer) = socket.into_split();
-        let _shutdown_rx = shutdown_rx.clone();
         Connection {
-            reader,
+            socket,
             socket_addr,
-            shutdown_rx: _shutdown_rx,
-            http_handler: Arc::new(Mutex::new(Dashboard::new(socket_addr, writer))),
-            tcp_handler: Arc::new(Mutex::new(TCP::new(socket_addr))),
+            shutdown_rx,
         }
     }
 
@@ -112,25 +100,24 @@ impl Connection {
             }
         }
 
-        // TODO: How to shutdown obviously?
-        // match self.socket.shutdown().await {
-        //     Ok(()) => trace!("successfully shutdown {} socket", self.socket_addr),
-        //     Err(e) => {
-        //         error!(
-        //             "failed to shutdown socket with {} address : {}",
-        //             self.socket_addr, e
-        //         )
-        //     }
-        // }
+        match self.socket.shutdown().await {
+            Ok(()) => trace!("successfully shutdown {} socket", self.socket_addr),
+            Err(e) => {
+                error!(
+                    "failed to shutdown socket with {} address : {}",
+                    self.socket_addr, e
+                )
+            }
+        }
 
         trace!("we have moved from select in Connection.process_socket");
     }
 
-    async fn read_data(&mut self) -> Option<Box<dyn std::error::Error>> {
+    async fn read_data(&mut self) -> Option<Box<dyn Error>> {
         loop {
             let mut buf = [0; 1024];
             // Read data from socket.
-            let n = match self.reader.read(&mut buf).await {
+            let n = match self.socket.read(&mut buf).await {
                 Ok(n) => {
                     trace!("read {} bytes from {} client", n, self.socket_addr);
                     n
@@ -169,7 +156,7 @@ impl Connection {
         &mut self,
         n: usize,
         buf: &[u8],
-    ) -> Result<ProcessDataResult, Box<dyn std::error::Error>> {
+    ) -> Result<ProcessDataResult, Box<dyn Error>> {
         match n {
             n if n == 0 => {
                 trace!("connection with {} client closed", self.socket_addr);
@@ -188,24 +175,40 @@ impl Connection {
                 // We use n-2 to remove /r/n.
                 let truncated_buf: &[u8] = &buf[0..n - 2];
 
-                let handler: Arc<Mutex<dyn Handler>> = match truncated_buf {
-                    truncated_buf
-                    if truncated_buf.len() >= 14
-                        && &truncated_buf[0..14] == b"GET / HTTP/1.1" =>
-                        {
-                            self.http_handler.clone()
-                        }
-                    _ => self.tcp_handler.clone(),
-                };
-
-                let mut bh = handler.try_lock().unwrap();
-
-                match bh.handle(truncated_buf).await {
-                    None => Ok(ProcessDataResult::Ok),
-                    Some(e) => Err(e.to_string().into()),
+                if truncated_buf.len() >= 14 && &truncated_buf[0..14] == b"GET / HTTP/1.1" {
+                    return self
+                        .handle_dashboard()
+                        .await
+                        .map(|_| Ok(ProcessDataResult::Close))?;
                 }
+                self.handle_log(truncated_buf)
+                    .await
+                    .map(|_| Ok(ProcessDataResult::Ok))?
             }
         }
+    }
+
+    async fn handle_dashboard(&mut self) -> Result<(), Box<dyn Error>> {
+        let contents = fs::read_to_string("./dashboard/index.html").unwrap();
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}",
+            contents.len(),
+            contents
+        );
+        self.socket.write_all(response.as_bytes()).await?;
+        self.socket.flush().await?;
+        info!("send dashboard for {} client", self.socket_addr);
+        Ok(())
+    }
+
+    async fn handle_log(&self, buf: &[u8]) -> Result<(), Box<dyn Error>> {
+        // Convert bytes to string.
+        let data = from_utf8(buf)?;
+        info!(
+            "new data received from {} client : {:?}",
+            self.socket_addr, data
+        );
+        Ok(())
     }
 }
 
