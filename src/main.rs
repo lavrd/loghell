@@ -22,8 +22,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Builder::from_env(Env::default().default_filter_or(DEFAULT_LOG_LEVEL)).init();
 
     let socket_addr = env::var(ENV_SOCKET_ADDR).unwrap_or_else(|_| DEFAULT_SOCKET_ADDR.to_string());
+    let dashboard_content = include_str!("../dashboard/index.html");
 
-    let server = daemon::Server::new(socket_addr);
+    let server = daemon::Server::new(socket_addr, dashboard_content.to_string());
     let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(());
 
     tokio::spawn(async move {

@@ -1,5 +1,4 @@
 use std::error::Error;
-use std::fs;
 use std::net::SocketAddr;
 use std::str::from_utf8;
 
@@ -15,11 +14,15 @@ enum ProcessDataResult {
 
 pub struct Server {
     socket_addr: String,
+    dashboard_content: String,
 }
 
 impl Server {
-    pub fn new(socket_addr: String) -> Self {
-        Server { socket_addr }
+    pub fn new(socket_addr: String, dashboard_content: String) -> Self {
+        Server {
+            socket_addr,
+            dashboard_content,
+        }
     }
 
     pub async fn start(&self, shutdown_rx: watch::Receiver<()>) -> Result<(), Box<dyn Error>> {
@@ -51,10 +54,12 @@ impl Server {
             info!("new client; ip : {}", socket_addr);
 
             let _shutdown_rx = shutdown_rx.clone();
+            let _dashboard_content = self.dashboard_content.clone();
             tokio::spawn(async move {
                 trace!("spawn thread for {} client", socket_addr);
                 // TODO: Try to move outside spawn.
-                let mut connection = Connection::new(socket, socket_addr, _shutdown_rx);
+                let mut connection =
+                    Connection::new(socket, socket_addr, _shutdown_rx, _dashboard_content);
                 connection.process_socket().await;
                 trace!(
                     "moving from spawn in accept loop for {} client",
@@ -75,14 +80,21 @@ struct Connection {
     socket: TcpStream,
     socket_addr: SocketAddr,
     shutdown_rx: watch::Receiver<()>,
+    dashboard_content: String,
 }
 
 impl Connection {
-    fn new(socket: TcpStream, socket_addr: SocketAddr, shutdown_rx: watch::Receiver<()>) -> Self {
+    fn new(
+        socket: TcpStream,
+        socket_addr: SocketAddr,
+        shutdown_rx: watch::Receiver<()>,
+        dashboard_content: String,
+    ) -> Self {
         Connection {
             socket,
             socket_addr,
             shutdown_rx,
+            dashboard_content,
         }
     }
 
@@ -189,11 +201,10 @@ impl Connection {
     }
 
     async fn handle_dashboard(&mut self) -> Result<(), Box<dyn Error>> {
-        let contents = fs::read_to_string("./dashboard/index.html").unwrap();
         let response = format!(
             "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}",
-            contents.len(),
-            contents
+            self.dashboard_content.len(),
+            self.dashboard_content
         );
         self.socket.write_all(response.as_bytes()).await?;
         self.socket.flush().await?;
