@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 use std::str::from_utf8;
 
+use async_trait::async_trait;
 use log::{error, info};
 
 use crate::daemon::handler::Handler;
@@ -16,8 +17,9 @@ impl TCP {
     }
 }
 
+#[async_trait]
 impl Handler for TCP {
-    fn handle(&mut self, buf: &[u8]) -> Option<Box<dyn std::error::Error>> {
+    async fn handle(&mut self, buf: &[u8]) -> Option<Box<dyn std::error::Error>> {
         // Convert bytes to string.
         let data = match from_utf8(buf) {
             Ok(data) => data,

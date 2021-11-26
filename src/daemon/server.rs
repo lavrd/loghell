@@ -112,7 +112,7 @@ impl Connection {
             }
         }
 
-        // TODO: How to shutdown obviosly?
+        // TODO: How to shutdown obviously?
         // match self.socket.shutdown().await {
         //     Ok(()) => trace!("successfully shutdown {} socket", self.socket_addr),
         //     Err(e) => {
@@ -200,7 +200,7 @@ impl Connection {
 
                 let mut bh = handler.try_lock().unwrap();
 
-                match bh.handle(truncated_buf) {
+                match bh.handle(truncated_buf).await {
                     None => Ok(ProcessDataResult::Ok),
                     Some(e) => Err(e.to_string().into()),
                 }
