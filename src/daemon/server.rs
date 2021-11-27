@@ -1,11 +1,14 @@
 use std::error::Error;
 use std::net::SocketAddr;
 use std::str::from_utf8;
+use std::sync::Arc;
 
 use log::{debug, error, info, trace};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::watch;
+use tokio::sync::{watch, Mutex};
+
+use crate::Storage;
 
 enum ProcessDataResult {
     Ok,
@@ -15,13 +18,19 @@ enum ProcessDataResult {
 pub struct Server {
     socket_addr: String,
     dashboard_content: String,
+    storage: Arc<Mutex<Box<dyn Storage + Send>>>,
 }
 
 impl Server {
-    pub fn new(socket_addr: String, dashboard_content: String) -> Self {
+    pub fn new(
+        socket_addr: String,
+        dashboard_content: String,
+        storage: Arc<Mutex<Box<dyn Storage + Send>>>,
+    ) -> Self {
         Server {
             socket_addr,
             dashboard_content,
+            storage,
         }
     }
 
@@ -53,13 +62,15 @@ impl Server {
             let (socket, socket_addr) = listener.accept().await?;
             info!("new client; ip : {}", socket_addr);
 
-            let _shutdown_rx = shutdown_rx.clone();
-            let _dashboard_content = self.dashboard_content.clone();
+            let mut connection = Connection::new(
+                socket,
+                socket_addr,
+                shutdown_rx.clone(),
+                self.dashboard_content.clone(),
+                self.storage.clone(),
+            );
             tokio::spawn(async move {
                 trace!("spawn thread for {} client", socket_addr);
-                // TODO: Try to move outside spawn.
-                let mut connection =
-                    Connection::new(socket, socket_addr, _shutdown_rx, _dashboard_content);
                 connection.process_socket().await;
                 trace!(
                     "moving from spawn in accept loop for {} client",
@@ -81,6 +92,7 @@ struct Connection {
     socket_addr: SocketAddr,
     shutdown_rx: watch::Receiver<()>,
     dashboard_content: String,
+    storage: Arc<Mutex<Box<dyn Storage + Send>>>,
 }
 
 impl Connection {
@@ -89,12 +101,14 @@ impl Connection {
         socket_addr: SocketAddr,
         shutdown_rx: watch::Receiver<()>,
         dashboard_content: String,
+        storage: Arc<Mutex<Box<dyn Storage + Send>>>,
     ) -> Self {
         Connection {
             socket,
             socket_addr,
             shutdown_rx,
             dashboard_content,
+            storage,
         }
     }
 
@@ -219,6 +233,7 @@ impl Connection {
             "new data received from {} client : {:?}",
             self.socket_addr, data
         );
+        self.storage.lock().await.store(buf)?;
         Ok(())
     }
 }
