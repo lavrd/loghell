@@ -7,5 +7,12 @@
 <body>
 <h1>Loghell</h1>
 <p>Dashboard</p>
+<script>
+    // TODO: Add onerror and onopen notifications!
+    let eventSource = new EventSource("http://127.0.0.1:8080/sse");
+    eventSource.onmessage = (message) => {
+        console.log(message);
+    };
+</script>
 </body>
 </html>

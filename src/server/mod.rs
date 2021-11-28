@@ -196,14 +196,19 @@ impl Connection {
                 Ok(ProcessDataResult::Close)
             }
             n => {
-                // TODO: This is tested only with telnet client.
-                // TODO: May be we should move it to tcp handler only?
-                // We use n-2 to remove /r/n.
+                // TODO: May be we should move it to log handler only?
+                // We use n-2 to remove /r/n at the end of data.
                 let truncated_buf: &[u8] = &buf[0..n - 2];
 
-                if truncated_buf.len() >= 14 && &truncated_buf[0..14] == b"GET / HTTP/1.1" {
+                if truncated_buf.starts_with(b"GET / HTTP/1.1") {
                     return self
                         .handle_dashboard()
+                        .await
+                        .map(|_| Ok(ProcessDataResult::Close))?;
+                }
+                if truncated_buf.starts_with(b"GET /sse HTTP/1.1") {
+                    return self
+                        .handle_sse()
                         .await
                         .map(|_| Ok(ProcessDataResult::Close))?;
                 }
@@ -235,6 +240,40 @@ impl Connection {
         );
         self.storage.lock().await.store(buf)?;
         Ok(())
+    }
+
+    async fn handle_sse(&mut self) -> Result<(), Box<dyn Error>> {
+        let response = "HTTP/1.1 200 OK
+Connection: keep-alive
+Content-Type: text/event-stream
+Cache-Control: no-cache
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Methods: GET";
+        self.socket.write_all(response.as_bytes()).await?;
+        self.socket.flush().await?;
+
+        self.socket.write_all(b"retry: 10000\n").await?;
+        self.socket.flush().await?;
+        self.socket.write_all(b"event: data\n").await?;
+        self.socket.flush().await?;
+
+        let mut _shutdown_rx = self.shutdown_rx.clone();
+        tokio::select! {
+            res = self.send_sse_data() => { res },
+            _ = _shutdown_rx.changed() => {
+                trace!("terminating sse send data loop; client : {}", self.socket_addr);
+                Ok(())
+            }
+        }
+    }
+
+    async fn send_sse_data(&mut self) -> Result<(), Box<dyn Error>> {
+        loop {
+            self.socket.write_all(b"data\n\n").await?;
+            self.socket.flush().await?;
+            trace!("send sse data to {} client", self.socket_addr);
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        }
     }
 }
 
