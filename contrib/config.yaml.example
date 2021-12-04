@@ -1,0 +1,5 @@
+fields:
+  - name: level
+    data_type: text
+  - name: time
+    data_type: u64

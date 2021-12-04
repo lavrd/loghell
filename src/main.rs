@@ -14,9 +14,11 @@ mod storage;
 const DEFAULT_LOG_LEVEL: &str = "TRACE";
 const DEFAULT_SOCKET_ADDR: &str = "127.0.0.1:0";
 const DEFAULT_STORAGE: &str = "dummy";
+const DEFAULT_CONFIG: &str = "./contrib/config.toml";
 
 const ENV_SOCKET_ADDR: &str = "SOCKET_ADDR";
 const ENV_STORAGE: &str = "STORAGE";
+const ENV_CONFIG: &str = "CONFIG";
 
 #[repr(u8)]
 enum ExitCode {

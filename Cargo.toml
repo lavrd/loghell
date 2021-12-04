@@ -10,3 +10,6 @@ tokio = { version = "1.14", features = ["net", "io-util", "macros", "rt-multi-th
 log = "0.4"
 env_logger = "0.9"
 regex = "1"
+serde = "1.0"
+serde_yaml = "0.8"
+tantivy = "0.16"
