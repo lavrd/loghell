@@ -9,7 +9,7 @@
 <p>Dashboard</p>
 <script>
     // TODO: Add onerror and onopen notifications!
-    let eventSource = new EventSource("http://127.0.0.1:8080/sse");
+    let eventSource = new EventSource("http://127.0.0.1:{{port}}/sse");
     eventSource.onmessage = (message) => {
         console.log(message);
     };

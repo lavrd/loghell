@@ -89,6 +89,7 @@ version = "2.0.0"
 dependencies = [
  "env_logger",
  "log",
+ "regex",
  "tokio",
 ]
 

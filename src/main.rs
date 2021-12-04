@@ -35,7 +35,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let storage = Arc::new(Mutex::new(storage::new_storage(&storage_name)?));
 
-    let server = server::Server::new(socket_addr, dashboard_content.to_string(), storage);
+    let mut server = server::Server::new(socket_addr, dashboard_content.to_string(), storage);
     let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(());
 
     tokio::spawn(async move {
