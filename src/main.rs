@@ -8,17 +8,18 @@ use tokio::sync::Mutex;
 
 use crate::storage::Storage;
 
+mod config;
 mod server;
 mod storage;
 
 const DEFAULT_LOG_LEVEL: &str = "TRACE";
 const DEFAULT_SOCKET_ADDR: &str = "127.0.0.1:0";
-const DEFAULT_STORAGE: &str = "dummy";
-const DEFAULT_CONFIG: &str = "./contrib/config.toml";
+const DEFAULT_STORAGE: &str = "tantivy";
+const DEFAULT_CONFIG_PATH: &str = "./contrib/config.yaml";
 
 const ENV_SOCKET_ADDR: &str = "SOCKET_ADDR";
 const ENV_STORAGE: &str = "STORAGE";
-const ENV_CONFIG: &str = "CONFIG";
+const ENV_CONFIG_PATH: &str = "CONFIG_PATH";
 
 #[repr(u8)]
 enum ExitCode {
@@ -33,9 +34,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let socket_addr = env::var(ENV_SOCKET_ADDR).unwrap_or_else(|_| DEFAULT_SOCKET_ADDR.to_string());
     let storage_name = env::var(ENV_STORAGE).unwrap_or_else(|_| DEFAULT_STORAGE.to_string());
+    let config_path = env::var(ENV_CONFIG_PATH).unwrap_or_else(|_| DEFAULT_CONFIG_PATH.to_string());
     let dashboard_content = include_str!("../dashboard/index.html");
 
-    let storage = Arc::new(Mutex::new(storage::new_storage(&storage_name)?));
+    let config = config::Config::new(&config_path)?;
+
+    let storage = Arc::new(Mutex::new(storage::new_storage(
+        &storage_name,
+        config.storage,
+    )?));
 
     let mut server = server::Server::new(socket_addr, dashboard_content.to_string(), storage);
     let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(());

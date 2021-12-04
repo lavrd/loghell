@@ -7,7 +7,7 @@ use log::{debug, error, info, trace};
 use regex::Regex;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::{Mutex, watch};
+use tokio::sync::{watch, Mutex};
 
 use crate::Storage;
 
@@ -45,8 +45,9 @@ impl Server {
         info!("socket starts at : {}", local_addr);
 
         let re = Regex::new(r"\{\{port}}").unwrap();
-        self.dashboard_content =
-            re.replace(&self.dashboard_content, &local_addr.port().to_string()).to_string();
+        self.dashboard_content = re
+            .replace(&self.dashboard_content, &local_addr.port().to_string())
+            .to_string();
 
         let mut _shutdown_rx = shutdown_rx.clone();
         tokio::select! {

@@ -5,6 +5,8 @@ use log::info;
 use dummy::Dummy;
 use storage_type::StorageType;
 
+use crate::config::Storage as StorageConfig;
+
 use self::tantivy::Tantivy;
 
 mod dummy;
@@ -15,11 +17,14 @@ pub trait Storage {
     fn store(&mut self, data: &[u8]) -> Result<(), Box<dyn Error>>;
 }
 
-pub fn new_storage(storage_name: &str) -> Result<Box<dyn Storage + Send>, Box<dyn Error>> {
+pub fn new_storage(
+    storage_name: &str,
+    config: StorageConfig,
+) -> Result<Box<dyn Storage + Send>, Box<dyn Error>> {
     let storage_type = storage_name.into();
     let storage: Box<dyn Storage + Send> = match storage_type {
         StorageType::Dummy => Box::new(Dummy::new()),
-        StorageType::Tantivy => Box::new(Tantivy::new()?),
+        StorageType::Tantivy => Box::new(Tantivy::new(config.tantivy)?),
         StorageType::Unknown => {
             return Err(format!("unknown storage type : {}", storage_name).into());
         }
