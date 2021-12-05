@@ -22,7 +22,6 @@ pub struct Tantivy {
 #[derive(Debug, Deserialize)]
 pub struct TantivyFields {
     pub text: Box<[String]>,
-    pub u64: Box<[String]>,
 }
 
 impl Config {
