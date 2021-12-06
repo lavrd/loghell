@@ -5,8 +5,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
 use serde_json::Value;
+use tantivy::schema::{Schema, FAST, STORED, TEXT};
 use tantivy::{Document, Index, IndexWriter};
-use tantivy::schema::{FAST, Schema, STORED, TEXT};
 
 use crate::config::Tantivy as TantivyConfig;
 use crate::storage::Storage;
@@ -28,7 +28,7 @@ impl Tantivy {
         let mut schema_builder = Schema::builder();
 
         schema_builder.add_u64_field("_loghell_time", FAST); // TODO: To const.
-        // schema_builder.add_text_field("data", TEXT | STORED);
+                                                             // schema_builder.add_text_field("data", TEXT | STORED);
         for text_field in config.fields.text.iter() {
             schema_builder.add_text_field(text_field, TEXT | STORED);
         }
@@ -54,7 +54,10 @@ impl Storage for Tantivy {
 
         println!("{}", data_as_value.to_string());
 
-        let doc = self.index.schema().parse_document(&data_as_value.to_string())?;
+        let doc = self
+            .index
+            .schema()
+            .parse_document(&data_as_value.to_string())?;
 
         println!("{}", self.schema.to_json(&doc));
 
@@ -129,17 +132,16 @@ impl Storage for Tantivy {
 
 #[cfg(test)]
 mod tests {
-    use tantivy::schema::{Schema, STORED, TEXT};
+    use tantivy::schema::{Schema, STORED, STRING, TEXT};
 
     #[test]
     fn test() {
         let mut schema_builder = Schema::builder();
-        schema_builder.add_text_field("level", TEXT | STORED);
+        schema_builder.add_text_field("level", STRING | STORED);
         schema_builder.add_text_field("message", TEXT | STORED);
         let schema = schema_builder.build();
-
-        let doc = schema.parse_document(r#"{"level":"debug","message":"log"}"#).unwrap();
-        println!("{}", schema.to_json(&doc));
+        let log_as_str = r#"{"level":"debug","message":"log"}"#;
+        let doc = schema.parse_document(log_as_str).unwrap();
+        assert_eq!(log_as_str, schema.to_json(&doc));
     }
 }
-
