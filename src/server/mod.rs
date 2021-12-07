@@ -134,12 +134,16 @@ impl Connection {
 
         match self.socket.shutdown().await {
             Ok(()) => trace!("successfully shutdown {} socket", self.socket_addr),
-            Err(e) => {
-                error!(
+            Err(e) => match e.kind() {
+                std::io::ErrorKind::NotConnected => debug!(
+                    "cannot shutdown {} socket because it is already disconnected : {}",
+                    self.socket_addr, e
+                ),
+                _ => error!(
                     "failed to shutdown socket with {} address : {}",
                     self.socket_addr, e
-                )
-            }
+                ),
+            },
         }
 
         trace!("we have moved from select in Connection.process_socket");
@@ -275,7 +279,19 @@ Access-Control-Allow-Methods: GET";
 
     async fn send_sse_data(&mut self) -> Result<(), Box<dyn Error>> {
         loop {
-            self.socket.write_all(b"data\n\n").await?;
+            match self.socket.write_all(b"data\n\n").await {
+                Ok(()) => Ok(()),
+                Err(e) => match e.kind() {
+                    std::io::ErrorKind::BrokenPipe => {
+                        debug!(
+                            "cannot send sse data; looks like {} client has disconnected",
+                            self.socket_addr
+                        );
+                        return Ok(());
+                    }
+                    _ => Err(e),
+                },
+            }?;
             self.socket.flush().await?;
             trace!("send sse data to {} client", self.socket_addr);
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
