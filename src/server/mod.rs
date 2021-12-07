@@ -237,7 +237,7 @@ impl Connection {
         );
         self.socket.write_all(response.as_bytes()).await?;
         self.socket.flush().await?;
-        info!("send dashboard for {} client", self.socket_addr);
+        info!("sent dashboard for {} client", self.socket_addr);
         Ok(())
     }
 
@@ -293,7 +293,7 @@ Access-Control-Allow-Methods: GET";
                 },
             }?;
             self.socket.flush().await?;
-            trace!("send sse data to {} client", self.socket_addr);
+            trace!("sent sse data to {} client", self.socket_addr);
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         }
     }
