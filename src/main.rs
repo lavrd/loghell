@@ -1,5 +1,6 @@
 use std::env;
 use std::error::Error;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use env_logger::{Builder, Env};
@@ -38,20 +39,24 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let dashboard_content = include_str!("../dashboard/index.html");
 
     let config = config::Config::new(&config_path)?;
-
     let storage = Arc::new(Mutex::new(storage::new_storage(
         &storage_name,
         config.storage,
     )?));
-
-    let mut server = server::Server::new(socket_addr, dashboard_content.to_string(), storage);
+    let connection_counter = Arc::new(AtomicU64::new(0));
+    let mut server = server::Server::new(
+        socket_addr,
+        dashboard_content.to_string(),
+        storage,
+        connection_counter.clone(),
+    );
     let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(());
 
     tokio::spawn(async move {
         match server.start(shutdown_rx).await {
-            Ok(()) => debug!("daemon has been stopped successfully"),
+            Ok(()) => debug!("server has been stopped successfully"),
             Err(e) => {
-                error!("failed to start daemon : {}", e);
+                error!("failed to start server : {}", e);
                 std::process::exit(ExitCode::FailedToStartDaemon as i32);
             }
         }
@@ -60,16 +65,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
     tokio::signal::ctrl_c().await?;
     info!("ctrl+c signal has been received");
 
+    println!(
+        "server open connections : {}",
+        connection_counter.load(Ordering::Relaxed)
+    );
     shutdown_tx.send(())?;
     let timeout = tokio::time::sleep(tokio::time::Duration::from_secs(1));
     tokio::pin!(timeout);
     tokio::select! {
         _ = &mut timeout => {
-            error!("daemon stopping is timed out");
+            error!("server stopping is timed out");
             std::process::exit(ExitCode::FailedToStopDaemon as i32);
         }
         _ = shutdown_tx.closed() => {
-            debug!("daemon successfully stopped");
+            debug!("server successfully stopped");
         }
     }
 

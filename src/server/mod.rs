@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::net::SocketAddr;
 use std::str::from_utf8;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use log::{debug, error, info, trace};
@@ -20,6 +21,7 @@ pub struct Server {
     socket_addr: String,
     dashboard_content: String,
     storage: Arc<Mutex<Box<dyn Storage + Send>>>,
+    connection_counter: Arc<AtomicU64>,
 }
 
 impl Server {
@@ -27,11 +29,13 @@ impl Server {
         socket_addr: String,
         dashboard_content: String,
         storage: Arc<Mutex<Box<dyn Storage + Send>>>,
+        connection_counter: Arc<AtomicU64>,
     ) -> Self {
         Server {
             socket_addr,
             dashboard_content,
             storage,
+            connection_counter,
         }
     }
 
@@ -67,6 +71,7 @@ impl Server {
         loop {
             let (socket, socket_addr) = listener.accept().await?;
             info!("new client; ip : {}", socket_addr);
+            self.connection_counter.fetch_add(1, Ordering::Relaxed);
 
             let mut connection = Connection::new(
                 socket,
@@ -74,6 +79,7 @@ impl Server {
                 shutdown_rx.clone(),
                 self.dashboard_content.clone(),
                 self.storage.clone(),
+                self.connection_counter.clone(),
             );
             tokio::spawn(async move {
                 trace!("spawn thread for {} client", socket_addr);
@@ -89,7 +95,7 @@ impl Server {
 
 impl Drop for Server {
     fn drop(&mut self) {
-        trace!("dropping Daemon")
+        trace!("dropping Server")
     }
 }
 
@@ -99,6 +105,7 @@ struct Connection {
     shutdown_rx: watch::Receiver<()>,
     dashboard_content: String,
     storage: Arc<Mutex<Box<dyn Storage + Send>>>,
+    connection_counter: Arc<AtomicU64>,
 }
 
 impl Connection {
@@ -108,6 +115,7 @@ impl Connection {
         shutdown_rx: watch::Receiver<()>,
         dashboard_content: String,
         storage: Arc<Mutex<Box<dyn Storage + Send>>>,
+        connection_counter: Arc<AtomicU64>,
     ) -> Self {
         Connection {
             socket,
@@ -115,6 +123,7 @@ impl Connection {
             shutdown_rx,
             dashboard_content,
             storage,
+            connection_counter,
         }
     }
 
@@ -301,6 +310,9 @@ Access-Control-Allow-Methods: GET";
 
 impl Drop for Connection {
     fn drop(&mut self) {
-        trace!("dropping Connection for {} client", self.socket_addr)
+        trace!("dropping Connection for {} client", self.socket_addr);
+        self.connection_counter
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |x| Some(x - 1))
+            .unwrap();
     }
 }
