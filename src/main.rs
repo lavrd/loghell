@@ -1,5 +1,4 @@
 use std::env;
-use std::error::Error;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -7,10 +6,11 @@ use env_logger::{Builder, Env};
 use log::{debug, error, info};
 use tokio::sync::Mutex;
 
-use crate::storage::Storage;
+use crate::shared::FnRes;
 
 mod config;
 mod server;
+mod shared;
 mod storage;
 
 const DEFAULT_LOG_LEVEL: &str = "TRACE";
@@ -30,7 +30,7 @@ enum ExitCode {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main() -> FnRes<()> {
     Builder::from_env(Env::default().default_filter_or(DEFAULT_LOG_LEVEL)).init();
 
     let socket_addr = env::var(ENV_SOCKET_ADDR).unwrap_or_else(|_| DEFAULT_SOCKET_ADDR.to_string());
@@ -39,15 +39,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let dashboard_content = include_str!("../dashboard/index.html");
 
     let config = config::Config::new(&config_path)?;
-    let storage = Arc::new(Mutex::new(storage::new_storage(
-        &storage_name,
-        config.storage,
-    )?));
+    let storage = storage::new_storage(&storage_name, config.storage)?;
+    let shared_storage = Arc::new(Mutex::new(storage));
     let connection_counter = Arc::new(AtomicU64::new(0));
     let mut server = server::Server::new(
         socket_addr,
         dashboard_content.to_string(),
-        storage,
+        shared_storage,
         connection_counter.clone(),
     );
     let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(());

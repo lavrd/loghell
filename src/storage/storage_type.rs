@@ -1,12 +1,12 @@
 use std::fmt::{Display, Formatter};
 
 const UNKNOWN: &str = "unknown";
-const DUMMY: &str = "dummy";
+const NONSENSE: &str = "nonsense";
 const TANTIVY: &str = "tantivy";
 
 pub enum StorageType {
     Unknown,
-    Dummy,
+    Nonsense,
     Tantivy,
 }
 
@@ -15,7 +15,7 @@ impl Display for StorageType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let str = match self {
             StorageType::Unknown => UNKNOWN.to_string(),
-            StorageType::Dummy => DUMMY.to_string(),
+            StorageType::Nonsense => NONSENSE.to_string(),
             StorageType::Tantivy => TANTIVY.to_string(),
         };
         write!(f, "{}", str)
@@ -25,7 +25,7 @@ impl Display for StorageType {
 impl From<&str> for StorageType {
     fn from(str: &str) -> Self {
         match str {
-            DUMMY => StorageType::Dummy,
+            NONSENSE => StorageType::Nonsense,
             TANTIVY => StorageType::Tantivy,
             _ => StorageType::Unknown,
         }

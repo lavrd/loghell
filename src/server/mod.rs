@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::net::SocketAddr;
 use std::str::from_utf8;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -10,7 +9,8 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{watch, Mutex};
 
-use crate::Storage;
+use crate::storage::Storage;
+use crate::FnRes;
 
 enum ProcessDataResult {
     Ok,
@@ -20,7 +20,7 @@ enum ProcessDataResult {
 pub struct Server {
     socket_addr: String,
     dashboard_content: String,
-    storage: Arc<Mutex<Box<dyn Storage + Send>>>,
+    storage: Arc<Mutex<Storage>>,
     connection_counter: Arc<AtomicU64>,
 }
 
@@ -28,7 +28,7 @@ impl Server {
     pub fn new(
         socket_addr: String,
         dashboard_content: String,
-        storage: Arc<Mutex<Box<dyn Storage + Send>>>,
+        storage: Arc<Mutex<Storage>>,
         connection_counter: Arc<AtomicU64>,
     ) -> Self {
         Server {
@@ -39,7 +39,7 @@ impl Server {
         }
     }
 
-    pub async fn start(&mut self, shutdown_rx: watch::Receiver<()>) -> Result<(), Box<dyn Error>> {
+    pub async fn start(&mut self, shutdown_rx: watch::Receiver<()>) -> FnRes<()> {
         let listener = TcpListener::bind(&self.socket_addr).await?;
         /*
            We get local address from listener instead of use from &self
@@ -63,11 +63,7 @@ impl Server {
         }
     }
 
-    async fn accept(
-        &self,
-        listener: TcpListener,
-        shutdown_rx: watch::Receiver<()>,
-    ) -> Result<(), Box<dyn Error>> {
+    async fn accept(&self, listener: TcpListener, shutdown_rx: watch::Receiver<()>) -> FnRes<()> {
         loop {
             let (socket, socket_addr) = listener.accept().await?;
             info!("new client; ip : {}", socket_addr);
@@ -104,7 +100,7 @@ struct Connection {
     socket_addr: SocketAddr,
     shutdown_rx: watch::Receiver<()>,
     dashboard_content: String,
-    storage: Arc<Mutex<Box<dyn Storage + Send>>>,
+    storage: Arc<Mutex<Storage>>,
     connection_counter: Arc<AtomicU64>,
 }
 
@@ -114,7 +110,7 @@ impl Connection {
         socket_addr: SocketAddr,
         shutdown_rx: watch::Receiver<()>,
         dashboard_content: String,
-        storage: Arc<Mutex<Box<dyn Storage + Send>>>,
+        storage: Arc<Mutex<Storage>>,
         connection_counter: Arc<AtomicU64>,
     ) -> Self {
         Connection {
@@ -132,8 +128,8 @@ impl Connection {
         tokio::select! {
             res = self.read_data() => {
                 match res {
-                    None => debug!("connection with {} client closed successfully", self.socket_addr),
-                    Some(e) => error!("failed to read data from socket; client : {}; : {}", self.socket_addr, e)
+                    Ok(()) => debug!("connection with {} client closed successfully", self.socket_addr),
+                    Err(e) => error!("failed to read data from socket; client : {}; : {}", self.socket_addr, e)
                 }
             }
             _ = _shutdown_rx.changed() => {
@@ -158,7 +154,7 @@ impl Connection {
         trace!("we have moved from select in Connection.process_socket");
     }
 
-    async fn read_data(&mut self) -> Option<Box<dyn Error>> {
+    async fn read_data(&mut self) -> FnRes<()> {
         loop {
             let mut buf = [0; 1024];
             // Read data from socket.
@@ -169,7 +165,7 @@ impl Connection {
                 }
                 Err(e) => {
                     error!("failed to read data from {} client", self.socket_addr);
-                    return Some(e.to_string().into());
+                    return Err(e.to_string().into());
                 }
             };
             match self.process_data(n, &buf).await {
@@ -184,24 +180,20 @@ impl Connection {
                 Ok(ProcessDataResult::Close) => {
                     trace!("close connection with {} client", self.socket_addr);
                     // Go away from read loop to close connection with client.
-                    return None;
+                    return Ok(());
                 }
                 Err(e) => {
                     error!(
                         "failed to process data from {} client: {}",
                         self.socket_addr, e
                     );
-                    return Some(e);
+                    return Err(e.to_string().into());
                 }
             };
         }
     }
 
-    async fn process_data(
-        &mut self,
-        n: usize,
-        buf: &[u8],
-    ) -> Result<ProcessDataResult, Box<dyn Error>> {
+    async fn process_data(&mut self, n: usize, buf: &[u8]) -> FnRes<ProcessDataResult> {
         match n {
             n if n == 0 => {
                 trace!("connection with {} client closed", self.socket_addr);
@@ -238,7 +230,7 @@ impl Connection {
         }
     }
 
-    async fn handle_dashboard(&mut self) -> Result<(), Box<dyn Error>> {
+    async fn handle_dashboard(&mut self) -> FnRes<()> {
         let response = format!(
             "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}",
             self.dashboard_content.len(),
@@ -250,7 +242,7 @@ impl Connection {
         Ok(())
     }
 
-    async fn handle_log(&self, buf: &[u8]) -> Result<(), Box<dyn Error>> {
+    async fn handle_log(&self, buf: &[u8]) -> FnRes<()> {
         // Convert bytes to string.
         let data = from_utf8(buf)?;
         info!(
@@ -261,7 +253,7 @@ impl Connection {
         Ok(())
     }
 
-    async fn handle_sse(&mut self) -> Result<(), Box<dyn Error>> {
+    async fn handle_sse(&mut self) -> FnRes<()> {
         let response = "HTTP/1.1 200 OK
 Connection: keep-alive
 Content-Type: text/event-stream
@@ -286,7 +278,7 @@ Access-Control-Allow-Methods: GET";
         }
     }
 
-    async fn send_sse_data(&mut self) -> Result<(), Box<dyn Error>> {
+    async fn send_sse_data(&mut self) -> FnRes<()> {
         loop {
             match self.socket.write_all(b"data\n\n").await {
                 Ok(()) => Ok(()),
