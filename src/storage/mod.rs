@@ -16,13 +16,14 @@ pub type Storage = Box<dyn _Storage + Send>;
 
 pub trait _Storage {
     fn store(&mut self, data: &[u8]) -> FnRes<()>;
+    fn find(&self, query: &str) -> FnRes<Vec<Vec<u8>>>;
 }
 
 pub fn new_storage(storage_name: &str, config: StorageConfig) -> FnRes<Storage> {
     let storage_type = storage_name.into();
     let storage: Storage = match storage_type {
-        StorageType::Nonsense => Box::new(Nonsense::new()),
-        StorageType::Tantivy => Box::new(Tantivy::new(config.tantivy)?),
+        StorageType::Nonsense => Box::new(Nonsense::new(config.fields)),
+        StorageType::Tantivy => Box::new(Tantivy::new(config.fields)?),
         StorageType::Unknown => {
             return Err(format!("unknown storage type : {}", storage_name).into());
         }

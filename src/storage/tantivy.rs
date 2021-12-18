@@ -4,7 +4,7 @@ use serde_json::Value;
 use tantivy::schema::{Schema, FAST, STORED, TEXT};
 use tantivy::{Index, IndexWriter};
 
-use crate::config::Tantivy as TantivyConfig;
+use crate::config::Fields;
 use crate::storage::_Storage;
 use crate::FnRes;
 
@@ -16,10 +16,10 @@ pub struct Tantivy {
 }
 
 impl Tantivy {
-    pub fn new(config: TantivyConfig) -> FnRes<Self> {
+    pub fn new(fields: Fields) -> FnRes<Self> {
         let mut schema_builder = Schema::builder();
         schema_builder.add_u64_field(LOGHELL_TIME_FIELD_NAME, FAST);
-        for text_field in config.fields.text.iter() {
+        for text_field in fields.text.iter() {
             schema_builder.add_text_field(text_field, TEXT | STORED);
         }
 
@@ -50,5 +50,9 @@ impl _Storage for Tantivy {
         self.index_writer.commit()?;
 
         Ok(())
+    }
+
+    fn find(&self, _query: &str) -> FnRes<Vec<Vec<u8>>> {
+        todo!()
     }
 }

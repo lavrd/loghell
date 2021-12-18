@@ -12,16 +12,11 @@ pub struct Config {
 
 #[derive(Debug, Deserialize)]
 pub struct Storage {
-    pub tantivy: Tantivy,
+    pub fields: Fields,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Tantivy {
-    pub fields: TantivyFields,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct TantivyFields {
+pub struct Fields {
     pub text: Box<[String]>,
 }
 

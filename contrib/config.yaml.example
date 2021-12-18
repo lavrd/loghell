@@ -1,5 +1,3 @@
 storage:
-  tantivy:
-    fields:
-      text: ["level"]
-      u64: ["time"]
+  fields:
+    text: ["level"]
