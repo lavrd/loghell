@@ -12,11 +12,13 @@ mod nonsense;
 mod storage_type;
 mod tantivy;
 
+pub type FindRes = FnRes<Option<Vec<Vec<u8>>>>;
+
 pub type Storage = Box<dyn _Storage + Send>;
 
 pub trait _Storage {
     fn store(&mut self, data: &[u8]) -> FnRes<()>;
-    fn find(&self, query: &str) -> FnRes<Vec<Vec<u8>>>;
+    fn find(&self, query: &str) -> FindRes;
 }
 
 pub fn new_storage(storage_name: &str, config: StorageConfig) -> FnRes<Storage> {

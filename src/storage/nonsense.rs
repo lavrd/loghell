@@ -1,11 +1,17 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::config::Fields;
+use crate::shared;
 use crate::shared::FnRes;
-use crate::storage::_Storage;
+use crate::storage::{_Storage, FindRes};
+
+struct Data {
+    data: Vec<u8>,
+    created_at: u64,
+}
 
 pub struct Nonsense {
-    entries: HashMap<String, Vec<u8>>,
+    entries: HashMap<String, Data>,
     // field_name : { field_value : entry_id }
     index: HashMap<String, HashMap<String, HashSet<String>>>,
     fields: Fields,
@@ -39,40 +45,47 @@ impl _Storage for Nonsense {
             ids.insert(id.clone());
         }
 
-        self.entries.insert(id, data.to_vec());
+        self.entries.insert(id, Data {
+            data: data.to_vec(),
+            created_at: shared::now_as_nanos_u64()?,
+        });
 
         Ok(())
     }
 
-    fn find(&self, query: &str) -> FnRes<Vec<Vec<u8>>> {
-        let mut entries_ids: HashSet<String> = HashSet::new();
+    // TODO: Make alg better!
+    fn find(&self, query: &str) -> FindRes {
+        let mut entries_ids: HashSet<&String> = HashSet::new();
 
         for field_name in self.fields.text.iter() {
             match self.index.get(field_name) {
                 Some(ids_by_values) => {
-                    let ids = ids_by_values.get(query).unwrap();
-                    for id in ids.iter() {
-                        entries_ids.insert(id.to_string());
+                    match ids_by_values.get(query) {
+                        Some(ids) => entries_ids.extend(ids),
+                        None => continue
                     }
-                    // TODO: Why it is not working?
-                    // entries_ids = entries_ids.union(ids).collect();
                 }
                 None => continue,
             }
         }
 
         if entries_ids.is_empty() {
-            return Err("not found".to_string().into());
+            return Ok(None);
         }
+
+        let mut data: Vec<&Data> = Vec::new();
+        for id in entries_ids.iter() {
+            let entry = self.entries.get(*id).unwrap();
+            data.push(entry);
+        }
+        data.sort_by(|d1, d2| { d1.created_at.cmp(&d2.created_at) });
 
         let mut entries: Vec<Vec<u8>> = Vec::new();
-
-        for id in entries_ids.iter() {
-            let entry = self.entries.get(id).unwrap();
-            entries.push(entry.clone());
+        for d in data.iter() {
+            entries.push(d.data.clone());
         }
 
-        Ok(entries)
+        Ok(Some(entries))
     }
 }
 
@@ -99,12 +112,31 @@ mod tests {
         storage.store(log3.as_bytes()).unwrap();
         storage.store(log4.as_bytes()).unwrap();
 
-        let entries = storage.find("debug").unwrap();
-        assert_eq!(log1, String::from_utf8(entries[0].clone()).unwrap());
-        assert_eq!(log4, String::from_utf8(entries[1].clone()).unwrap());
-        let entries = storage.find("info").unwrap();
-        assert_eq!(log2, String::from_utf8(entries[0].clone()).unwrap());
-        let entries = storage.find("error").unwrap();
-        assert_eq!(log3, String::from_utf8(entries[0].clone()).unwrap());
+        {
+            let find_res = storage.find("debug").unwrap();
+            assert_ne!(find_res, None);
+            let entries = find_res.unwrap();
+            assert_eq!(2, entries.len());
+            assert_eq!(log1, String::from_utf8(entries[0].clone()).unwrap());
+            assert_eq!(log4, String::from_utf8(entries[1].clone()).unwrap());
+        }
+        {
+            let find_res = storage.find("info").unwrap();
+            assert_ne!(find_res, None);
+            let entries = find_res.unwrap();
+            assert_eq!(1, entries.len());
+            assert_eq!(log2, String::from_utf8(entries[0].clone()).unwrap());
+        }
+        {
+            let find_res = storage.find("error").unwrap();
+            assert_ne!(find_res, None);
+            let entries = find_res.unwrap();
+            assert_eq!(1, entries.len());
+            assert_eq!(log3, String::from_utf8(entries[0].clone()).unwrap());
+        }
+        {
+            let find_res = storage.find("unknown").unwrap();
+            assert_eq!(find_res, None);
+        }
     }
 }

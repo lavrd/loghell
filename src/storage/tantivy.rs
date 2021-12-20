@@ -1,12 +1,10 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use serde_json::Value;
-use tantivy::schema::{Schema, FAST, STORED, TEXT};
 use tantivy::{Index, IndexWriter};
+use tantivy::schema::{FAST, Schema, STORED, TEXT};
 
+use crate::{FnRes, shared};
 use crate::config::Fields;
-use crate::storage::_Storage;
-use crate::FnRes;
+use crate::storage::{_Storage, FindRes};
 
 const LOGHELL_TIME_FIELD_NAME: &str = "_loghell_time";
 
@@ -36,8 +34,7 @@ impl Tantivy {
 
 impl _Storage for Tantivy {
     fn store(&mut self, data: &[u8]) -> FnRes<()> {
-        let now_as_nanos_u128 = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
-        let now_as_nanos_u64 = u64::try_from(now_as_nanos_u128)?;
+        let now_as_nanos_u64 = shared::now_as_nanos_u64()?;
         let mut data_as_value: Value = serde_json::from_slice(data)?;
         data_as_value[LOGHELL_TIME_FIELD_NAME] = serde_json::Value::from(now_as_nanos_u64);
 
@@ -52,7 +49,7 @@ impl _Storage for Tantivy {
         Ok(())
     }
 
-    fn find(&self, _query: &str) -> FnRes<Vec<Vec<u8>>> {
+    fn find(&self, _query: &str) -> FindRes {
         todo!()
     }
 }
