@@ -15,3 +15,7 @@ serde_yaml = "0.8"
 serde_json = "1"
 tantivy = "0.16"
 uuid = { version = "1.0.0-alpha.1", features = ["v4", "fast-rng"] }
+
+[features]
+nonsense_find_v1 = []
+nonsense_find_v2 = []

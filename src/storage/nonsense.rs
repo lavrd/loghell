@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
+use log::warn;
+
 use crate::config::Fields;
 use crate::shared;
 use crate::shared::FnRes;
@@ -25,36 +27,9 @@ impl Nonsense {
             fields,
         }
     }
-}
 
-impl _Storage for Nonsense {
-    fn store(&mut self, data: &[u8]) -> FnRes<()> {
-        let id = uuid::Uuid::new_v4().to_string();
-        let data_as_value: serde_json::Value = serde_json::from_slice(data)?;
-
-        for field_name in self.fields.text.iter() {
-            let field_value = data_as_value[&field_name].to_string().replace("\"", "");
-
-            let ids_by_values = self
-                .index
-                .entry(field_name.clone())
-                .or_insert_with(HashMap::new);
-            let ids = ids_by_values
-                .entry(field_value.clone())
-                .or_insert_with(HashSet::new);
-            ids.insert(id.clone());
-        }
-
-        self.entries.insert(id, Data {
-            data: data.to_vec(),
-            created_at: shared::now_as_nanos_u64()?,
-        });
-
-        Ok(())
-    }
-
-    // TODO: Make alg better!
-    fn find(&self, query: &str) -> FindRes {
+    // #[cfg(feature = "nonsense_find_v1")]
+    fn find_v1(&self, query: &str) -> FindRes {
         let mut entries_ids: HashSet<&String> = HashSet::new();
 
         for field_name in self.fields.text.iter() {
@@ -86,6 +61,48 @@ impl _Storage for Nonsense {
         }
 
         Ok(Some(entries))
+    }
+
+    // #[cfg(feature = "nonsense_find_v2")]
+    fn find_v2(&self, _query: &str) -> FindRes {
+        Ok(None)
+    }
+}
+
+impl _Storage for Nonsense {
+    fn store(&mut self, data: &[u8]) -> FnRes<()> {
+        let id = uuid::Uuid::new_v4().to_string();
+        let data_as_value: serde_json::Value = serde_json::from_slice(data)?;
+
+        for field_name in self.fields.text.iter() {
+            let field_value = data_as_value[&field_name].to_string().replace("\"", "");
+
+            let ids_by_values = self
+                .index
+                .entry(field_name.clone())
+                .or_insert_with(HashMap::new);
+            let ids = ids_by_values
+                .entry(field_value.clone())
+                .or_insert_with(HashSet::new);
+            ids.insert(id.clone());
+        }
+
+        self.entries.insert(id, Data {
+            data: data.to_vec(),
+            created_at: shared::now_as_nanos_u64()?,
+        });
+
+        Ok(())
+    }
+
+    fn find(&self, query: &str) -> FindRes {
+        if cfg!(feature = "nonsense_find_v1") {
+            return self.find_v1(query);
+        } else if cfg!(feature = "nonsense_find_v2") {
+            return self.find_v2(query);
+        }
+        warn!("using find_v1 function as default find function for nonsense storage");
+        self.find_v1(query)
     }
 }
 
