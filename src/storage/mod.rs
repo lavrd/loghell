@@ -1,6 +1,5 @@
 use log::info;
 
-use crate::config::Storage as StorageConfig;
 use crate::shared::FnRes;
 
 use nonsense::Nonsense;
@@ -21,11 +20,11 @@ pub trait _Storage {
     fn find(&self, query: &str) -> FindRes;
 }
 
-pub fn new_storage(storage_name: &str, config: StorageConfig) -> FnRes<Storage> {
+pub fn new_storage(storage_name: &str) -> FnRes<Storage> {
     let storage_type = storage_name.into();
     let storage: Storage = match storage_type {
-        StorageType::Nonsense => Box::new(Nonsense::new(config.fields)),
-        StorageType::Tantivy => Box::new(Tantivy::new(config.fields)?),
+        StorageType::Nonsense => Box::new(Nonsense::new()),
+        StorageType::Tantivy => Box::new(Tantivy::new()?),
         StorageType::Unknown => {
             return Err(format!("unknown storage type : {}", storage_name).into());
         }

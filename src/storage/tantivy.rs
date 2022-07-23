@@ -1,10 +1,9 @@
 use serde_json::Value;
+use tantivy::schema::{Schema, FAST};
 use tantivy::{Index, IndexWriter};
-use tantivy::schema::{FAST, Schema, STORED, TEXT};
 
-use crate::{FnRes, shared};
-use crate::config::Fields;
-use crate::storage::{_Storage, FindRes};
+use crate::storage::{FindRes, _Storage};
+use crate::{shared, FnRes};
 
 const LOGHELL_TIME_FIELD_NAME: &str = "_loghell_time";
 
@@ -14,12 +13,9 @@ pub struct Tantivy {
 }
 
 impl Tantivy {
-    pub fn new(fields: Fields) -> FnRes<Self> {
+    pub fn new() -> FnRes<Self> {
         let mut schema_builder = Schema::builder();
         schema_builder.add_u64_field(LOGHELL_TIME_FIELD_NAME, FAST);
-        for text_field in fields.text.iter() {
-            schema_builder.add_text_field(text_field, TEXT | STORED);
-        }
 
         let schema = schema_builder.build();
         let index = Index::create_in_ram(schema);

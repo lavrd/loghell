@@ -2,10 +2,9 @@ use std::collections::{HashMap, HashSet};
 
 use log::warn;
 
-use crate::config::Fields;
 use crate::shared;
 use crate::shared::FnRes;
-use crate::storage::{_Storage, FindRes};
+use crate::storage::{FindRes, _Storage};
 
 struct Data {
     data: Vec<u8>,
@@ -16,15 +15,13 @@ pub struct Nonsense {
     entries: HashMap<String, Data>,
     // field_name : { field_value : entry_id }
     index: HashMap<String, HashMap<String, HashSet<String>>>,
-    fields: Fields,
 }
 
 impl Nonsense {
-    pub fn new(fields: Fields) -> Self {
+    pub fn new() -> Self {
         Nonsense {
             entries: HashMap::new(),
             index: HashMap::new(),
-            fields,
         }
     }
 
@@ -32,14 +29,9 @@ impl Nonsense {
     fn find_v1(&self, query: &str) -> FindRes {
         let mut entries_ids: HashSet<&String> = HashSet::new();
 
-        for field_name in self.fields.text.iter() {
-            match self.index.get(field_name) {
-                Some(ids_by_values) => {
-                    match ids_by_values.get(query) {
-                        Some(ids) => entries_ids.extend(ids),
-                        None => continue
-                    }
-                }
+        for (_, idx_store) in self.index.iter() {
+            match idx_store.get(query) {
+                Some(ids) => entries_ids.extend(ids),
                 None => continue,
             }
         }
@@ -53,7 +45,7 @@ impl Nonsense {
             let entry = self.entries.get(*id).unwrap();
             data.push(entry);
         }
-        data.sort_by(|d1, d2| { d1.created_at.cmp(&d2.created_at) });
+        data.sort_by(|d1, d2| d1.created_at.cmp(&d2.created_at));
 
         let mut entries: Vec<Vec<u8>> = Vec::new();
         for d in data.iter() {
@@ -74,23 +66,32 @@ impl _Storage for Nonsense {
         let id = uuid::Uuid::new_v4().to_string();
         let data_as_value: serde_json::Value = serde_json::from_slice(data)?;
 
-        for field_name in self.fields.text.iter() {
-            let field_value = data_as_value[&field_name].to_string().replace('\"', "");
+        if !data_as_value.is_object() {
+            return Err("nonsense storage can't work without objects".into());
+        }
+        let obj = data_as_value
+            .as_object()
+            .ok_or("failed to get data as object")?;
+        for (name, value) in obj.iter() {
+            let value = value.to_string().replace('\"', "");
 
             let ids_by_values = self
                 .index
-                .entry(field_name.clone())
+                .entry(name.to_string())
                 .or_insert_with(HashMap::new);
             let ids = ids_by_values
-                .entry(field_value.clone())
+                .entry(value.to_string())
                 .or_insert_with(HashSet::new);
             ids.insert(id.clone());
         }
 
-        self.entries.insert(id, Data {
-            data: data.to_vec(),
-            created_at: shared::now_as_nanos_u64()?,
-        });
+        self.entries.insert(
+            id,
+            Data {
+                data: data.to_vec(),
+                created_at: shared::now_as_nanos_u64()?,
+            },
+        );
 
         Ok(())
     }
@@ -108,16 +109,12 @@ impl _Storage for Nonsense {
 
 #[cfg(test)]
 mod tests {
-    use crate::config::Fields;
     use crate::storage::_Storage;
     use crate::storage::nonsense::Nonsense;
 
     #[test]
     fn test() {
-        let fields = Fields {
-            text: Box::new(["level".to_string()]) as Box<[String]>,
-        };
-        let mut storage = Nonsense::new(fields);
+        let mut storage = Nonsense::new();
 
         let log1 = r#"{"level":"debug","message":"test-1"}"#;
         let log2 = r#"{"level":"info","message":"test-2"}"#;
@@ -154,6 +151,11 @@ mod tests {
         {
             let find_res = storage.find("unknown").unwrap();
             assert_eq!(find_res, None);
+        }
+        {
+            let res = storage.store(r#"0"#.as_bytes());
+            assert!(res.is_err());
+            assert_eq!(res.unwrap_err().to_string(), "nonsense storage can't work without objects");
         }
     }
 }

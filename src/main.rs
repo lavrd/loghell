@@ -8,19 +8,16 @@ use tokio::sync::Mutex;
 
 use crate::shared::FnRes;
 
-mod config;
 mod server;
 mod shared;
 mod storage;
 
 const DEFAULT_LOG_LEVEL: &str = "TRACE";
 const DEFAULT_SOCKET_ADDR: &str = "127.0.0.1:0";
-const DEFAULT_STORAGE: &str = "tantivy";
-const DEFAULT_CONFIG_PATH: &str = "./contrib/config.yaml";
+const DEFAULT_STORAGE: &str = "nonsense";
 
 const ENV_SOCKET_ADDR: &str = "SOCKET_ADDR";
 const ENV_STORAGE: &str = "STORAGE";
-const ENV_CONFIG_PATH: &str = "CONFIG_PATH";
 
 #[repr(u8)]
 enum ExitCode {
@@ -35,11 +32,9 @@ async fn main() -> FnRes<()> {
 
     let socket_addr = env::var(ENV_SOCKET_ADDR).unwrap_or_else(|_| DEFAULT_SOCKET_ADDR.to_string());
     let storage_name = env::var(ENV_STORAGE).unwrap_or_else(|_| DEFAULT_STORAGE.to_string());
-    let config_path = env::var(ENV_CONFIG_PATH).unwrap_or_else(|_| DEFAULT_CONFIG_PATH.to_string());
     let dashboard_content = include_str!("../dashboard/index.html");
 
-    let config = config::Config::new(&config_path)?;
-    let storage = storage::new_storage(&storage_name, config.storage)?;
+    let storage = storage::new_storage(&storage_name)?;
     let shared_storage = Arc::new(Mutex::new(storage));
     let connection_counter = Arc::new(AtomicU64::new(0));
     let mut server = server::Server::new(
