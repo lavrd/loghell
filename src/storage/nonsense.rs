@@ -75,7 +75,7 @@ impl _Storage for Nonsense {
         let data_as_value: serde_json::Value = serde_json::from_slice(data)?;
 
         for field_name in self.fields.text.iter() {
-            let field_value = data_as_value[&field_name].to_string().replace("\"", "");
+            let field_value = data_as_value[&field_name].to_string().replace('\"', "");
 
             let ids_by_values = self
                 .index
