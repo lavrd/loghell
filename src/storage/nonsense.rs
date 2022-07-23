@@ -1,7 +1,5 @@
 use std::collections::{HashMap, HashSet};
 
-use log::warn;
-
 use crate::shared;
 use crate::shared::FnRes;
 use crate::storage::{FindRes, _Storage};
@@ -23,41 +21,6 @@ impl Nonsense {
             entries: HashMap::new(),
             index: HashMap::new(),
         }
-    }
-
-    // #[cfg(feature = "nonsense_find_v1")]
-    fn find_v1(&self, query: &str) -> FindRes {
-        let mut entries_ids: HashSet<&String> = HashSet::new();
-
-        for (_, idx_store) in self.index.iter() {
-            match idx_store.get(query) {
-                Some(ids) => entries_ids.extend(ids),
-                None => continue,
-            }
-        }
-
-        if entries_ids.is_empty() {
-            return Ok(None);
-        }
-
-        let mut data: Vec<&Data> = Vec::new();
-        for id in entries_ids.iter() {
-            let entry = self.entries.get(*id).unwrap();
-            data.push(entry);
-        }
-        data.sort_by(|d1, d2| d1.created_at.cmp(&d2.created_at));
-
-        let mut entries: Vec<Vec<u8>> = Vec::new();
-        for d in data.iter() {
-            entries.push(d.data.clone());
-        }
-
-        Ok(Some(entries))
-    }
-
-    // #[cfg(feature = "nonsense_find_v2")]
-    fn find_v2(&self, _query: &str) -> FindRes {
-        Ok(None)
     }
 }
 
@@ -89,14 +52,39 @@ impl _Storage for Nonsense {
         Ok(())
     }
 
+    #[cfg(feature = "nonsense_find_v1")]
     fn find(&self, query: &str) -> FindRes {
-        if cfg!(feature = "nonsense_find_v1") {
-            return self.find_v1(query);
-        } else if cfg!(feature = "nonsense_find_v2") {
-            return self.find_v2(query);
+        let mut entries_ids: HashSet<&String> = HashSet::new();
+
+        for (_, idx_store) in self.index.iter() {
+            match idx_store.get(query) {
+                Some(ids) => entries_ids.extend(ids),
+                None => continue,
+            }
         }
-        warn!("using find_v1 function as default find function for nonsense storage");
-        self.find_v1(query)
+
+        if entries_ids.is_empty() {
+            return Ok(None);
+        }
+
+        let mut data: Vec<&Data> = Vec::new();
+        for id in entries_ids.iter() {
+            let entry = self.entries.get(*id).unwrap();
+            data.push(entry);
+        }
+        data.sort_by(|d1, d2| d1.created_at.cmp(&d2.created_at));
+
+        let mut entries: Vec<Vec<u8>> = Vec::new();
+        for d in data.iter() {
+            entries.push(d.data.clone());
+        }
+
+        Ok(Some(entries))
+    }
+
+    #[cfg(feature = "nonsense_find_v2")]
+    fn find(&self, _query: &str) -> FindRes {
+        Ok(None)
     }
 }
 
