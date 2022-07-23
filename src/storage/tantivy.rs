@@ -43,7 +43,7 @@ impl _Storage for Tantivy {
             .schema()
             .parse_document(&data_as_value.to_string())?;
 
-        self.index_writer.add_document(doc);
+        self.index_writer.add_document(doc)?;
         self.index_writer.commit()?;
 
         Ok(())
