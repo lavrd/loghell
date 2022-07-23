@@ -6,10 +6,10 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/lavrxxx/loghell/go/writer"
-
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
+	"github.com/lavrd/loghell/go/writer"
 )
 
 func main() {

@@ -1,3 +1,3 @@
-module github.com/lavrxxx/loghell/go/writer
+module github.com/lavrd/loghell/go/writer
 
-go 1.17
+go 1.18
