@@ -53,10 +53,10 @@ impl Server {
             .replace(&self.dashboard_content, &local_addr.port().to_string())
             .to_string();
 
-        let mut _shutdown_rx = shutdown_rx.clone();
+        let mut shutdown_rx_ = shutdown_rx.clone();
         tokio::select! {
             res = self.accept(listener, shutdown_rx.clone()) => { res }
-            _ = _shutdown_rx.changed() => {
+            _ = shutdown_rx_.changed() => {
                 debug!("terminating accept new clients loop");
                 Ok(())
             }
@@ -124,7 +124,7 @@ impl Connection {
     }
 
     async fn process_socket(&mut self) {
-        let mut _shutdown_rx = self.shutdown_rx.clone();
+        let mut shutdown_rx_ = self.shutdown_rx.clone();
         tokio::select! {
             res = self.read_data() => {
                 match res {
@@ -132,7 +132,7 @@ impl Connection {
                     Err(e) => error!("failed to read data from socket; client : {}; : {}", self.socket_addr, e)
                 }
             }
-            _ = _shutdown_rx.changed() => {
+            _ = shutdown_rx_.changed() => {
                 trace!("terminating read data loop; client : {}", self.socket_addr);
             }
         }
@@ -207,23 +207,19 @@ impl Connection {
                 Ok(ProcessDataResult::Close)
             }
             n => {
-                // TODO: May be we should move it to log handler only?
-                // We use n-2 to remove /r/n at the end of data.
-                let truncated_buf: &[u8] = &buf[0..n - 2];
-
-                if truncated_buf.starts_with(b"GET / HTTP/1.1") {
+                if buf.starts_with(b"GET / HTTP/1.1") {
                     return self
                         .handle_dashboard()
                         .await
                         .map(|_| Ok(ProcessDataResult::Close))?;
                 }
-                if truncated_buf.starts_with(b"GET /sse HTTP/1.1") {
+                if buf.starts_with(b"GET /events HTTP/1.1") {
                     return self
                         .handle_sse()
                         .await
                         .map(|_| Ok(ProcessDataResult::Close))?;
                 }
-                self.handle_log(truncated_buf)
+                self.handle_log(buf, n)
                     .await
                     .map(|_| Ok(ProcessDataResult::Ok))?
             }
@@ -242,14 +238,18 @@ impl Connection {
         Ok(())
     }
 
-    async fn handle_log(&self, buf: &[u8]) -> FnRes<()> {
+    async fn handle_log(&self, buf: &[u8], n: usize) -> FnRes<()> {
+        // We use n-2 to remove /r/n at the end of data.
+        let truncated_buf: &[u8] = &buf[0..n - 2];
+
         // Convert bytes to string.
-        let data = from_utf8(buf)?;
+        let data = from_utf8(truncated_buf)?;
         info!(
             "new data received from {} client : {:?}",
             self.socket_addr, data
         );
-        self.storage.lock().await.store(buf)?;
+
+        self.storage.lock().await.store(truncated_buf)?;
         Ok(())
     }
 
@@ -268,10 +268,10 @@ Access-Control-Allow-Methods: GET";
         self.socket.write_all(b"event: data\n").await?;
         self.socket.flush().await?;
 
-        let mut _shutdown_rx = self.shutdown_rx.clone();
+        let mut shutdown_rx_ = self.shutdown_rx.clone();
         tokio::select! {
             res = self.send_sse_data() => { res },
-            _ = _shutdown_rx.changed() => {
+            _ = shutdown_rx_.changed() => {
                 trace!("terminating sse send data loop; client : {}", self.socket_addr);
                 Ok(())
             }

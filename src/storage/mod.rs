@@ -1,10 +1,10 @@
 use log::info;
 
-use nonsense::Nonsense;
-use storage_type::StorageType;
-
 use crate::config::Storage as StorageConfig;
 use crate::shared::FnRes;
+
+use nonsense::Nonsense;
+use storage_type::StorageType;
 
 use self::tantivy::Tantivy;
 
