@@ -1,18 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="utf-8">
-    <title>Loghell</title>
+  <meta charset="utf-8">
+  <title>Loghell</title>
 </head>
+
 <body>
-<h1>Loghell</h1>
-<p>Dashboard</p>
-<script>
-    // TODO: Add onerror and onopen notifications!
+  <h1>Loghell</h1>
+  <p>Dashboard</p>
+  <script>
     let eventSource = new EventSource("http://127.0.0.1:{{port}}/events");
     eventSource.onmessage = (message) => {
-        console.log(message);
+      console.log(message);
     };
-</script>
+    evtSource.onerror = (err) => {
+      console.error(err);
+    };
+  </script>
 </body>
+
 </html>

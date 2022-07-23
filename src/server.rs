@@ -48,7 +48,7 @@ impl Server {
         let local_addr = listener.local_addr()?;
         info!("socket starts at : {}", local_addr);
 
-        let re = Regex::new(r"\{\{port}}").unwrap();
+        let re = Regex::new(r"\{\{port\}\}").unwrap();
         self.dashboard_content =
             re.replace(&self.dashboard_content, &local_addr.port().to_string()).to_string();
 
@@ -233,9 +233,7 @@ impl Connection {
         let response = "HTTP/1.1 200 OK
 Connection: keep-alive
 Content-Type: text/event-stream
-Cache-Control: no-cache
-Access-Control-Allow-Origin: *
-Access-Control-Allow-Methods: GET";
+Cache-Control: no-cache";
         self.socket.write_all(response.as_bytes()).await?;
         self.socket.flush().await?;
 
