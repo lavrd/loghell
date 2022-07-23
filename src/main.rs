@@ -58,10 +58,7 @@ async fn main() -> FnRes<()> {
     tokio::signal::ctrl_c().await?;
     info!("ctrl+c signal has been received");
 
-    println!(
-        "server open connections : {}",
-        connection_counter.load(Ordering::Relaxed)
-    );
+    println!("server open connections : {}", connection_counter.load(Ordering::Relaxed));
     shutdown_tx.send(())?;
     let timeout = tokio::time::sleep(tokio::time::Duration::from_secs(1));
     tokio::pin!(timeout);

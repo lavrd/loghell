@@ -49,9 +49,8 @@ impl Server {
         info!("socket starts at : {}", local_addr);
 
         let re = Regex::new(r"\{\{port}}").unwrap();
-        self.dashboard_content = re
-            .replace(&self.dashboard_content, &local_addr.port().to_string())
-            .to_string();
+        self.dashboard_content =
+            re.replace(&self.dashboard_content, &local_addr.port().to_string()).to_string();
 
         let mut shutdown_rx_ = shutdown_rx.clone();
         tokio::select! {
@@ -80,10 +79,7 @@ impl Server {
             tokio::spawn(async move {
                 trace!("spawn thread for {} client", socket_addr);
                 connection.process_socket().await;
-                trace!(
-                    "moving from spawn in accept loop for {} client",
-                    socket_addr
-                );
+                trace!("moving from spawn in accept loop for {} client", socket_addr);
             });
         }
     }
@@ -144,10 +140,7 @@ impl Connection {
                     "cannot shutdown {} socket because it is already disconnected : {}",
                     self.socket_addr, e
                 ),
-                _ => error!(
-                    "failed to shutdown socket with {} address : {}",
-                    self.socket_addr, e
-                ),
+                _ => error!("failed to shutdown socket with {} address : {}", self.socket_addr, e),
             },
         }
 
@@ -170,10 +163,7 @@ impl Connection {
             };
             match self.process_data(n, &buf).await {
                 Ok(ProcessDataResult::Ok) => {
-                    trace!(
-                        "data from {} client successfully proceeded",
-                        self.socket_addr
-                    );
+                    trace!("data from {} client successfully proceeded", self.socket_addr);
                     // Read next frame from socket.
                     continue;
                 }
@@ -183,10 +173,7 @@ impl Connection {
                     return Ok(());
                 }
                 Err(e) => {
-                    error!(
-                        "failed to process data from {} client: {}",
-                        self.socket_addr, e
-                    );
+                    error!("failed to process data from {} client: {}", self.socket_addr, e);
                     return Err(e.to_string().into());
                 }
             };
@@ -208,20 +195,12 @@ impl Connection {
             }
             n => {
                 if buf.starts_with(b"GET / HTTP/1.1") {
-                    return self
-                        .handle_dashboard()
-                        .await
-                        .map(|_| Ok(ProcessDataResult::Close))?;
+                    return self.handle_dashboard().await.map(|_| Ok(ProcessDataResult::Close))?;
                 }
                 if buf.starts_with(b"GET /events HTTP/1.1") {
-                    return self
-                        .handle_sse()
-                        .await
-                        .map(|_| Ok(ProcessDataResult::Close))?;
+                    return self.handle_sse().await.map(|_| Ok(ProcessDataResult::Close))?;
                 }
-                self.handle_log(buf, n)
-                    .await
-                    .map(|_| Ok(ProcessDataResult::Ok))?
+                self.handle_log(buf, n).await.map(|_| Ok(ProcessDataResult::Ok))?
             }
         }
     }
@@ -244,10 +223,7 @@ impl Connection {
 
         // Convert bytes to string.
         let data = from_utf8(truncated_buf)?;
-        info!(
-            "new data received from {} client : {:?}",
-            self.socket_addr, data
-        );
+        info!("new data received from {} client : {:?}", self.socket_addr, data);
 
         self.storage.lock().await.store(truncated_buf)?;
         Ok(())

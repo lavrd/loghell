@@ -34,10 +34,7 @@ impl _Storage for Tantivy {
         let mut data_as_value: Value = serde_json::from_slice(data)?;
         data_as_value[LOGHELL_TIME_FIELD_NAME] = serde_json::Value::from(now_as_nanos_u64);
 
-        let doc = self
-            .index
-            .schema()
-            .parse_document(&data_as_value.to_string())?;
+        let doc = self.index.schema().parse_document(&data_as_value.to_string())?;
 
         self.index_writer.add_document(doc)?;
         self.index_writer.commit()?;

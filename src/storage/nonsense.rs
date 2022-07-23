@@ -69,19 +69,12 @@ impl _Storage for Nonsense {
         if !data_as_value.is_object() {
             return Err("nonsense storage can't work without objects".into());
         }
-        let obj = data_as_value
-            .as_object()
-            .ok_or("failed to get data as object")?;
+        let obj = data_as_value.as_object().ok_or("failed to get data as object")?;
         for (name, value) in obj.iter() {
             let value = value.to_string().replace('\"', "");
 
-            let ids_by_values = self
-                .index
-                .entry(name.to_string())
-                .or_insert_with(HashMap::new);
-            let ids = ids_by_values
-                .entry(value.to_string())
-                .or_insert_with(HashSet::new);
+            let ids_by_values = self.index.entry(name.to_string()).or_insert_with(HashMap::new);
+            let ids = ids_by_values.entry(value.to_string()).or_insert_with(HashSet::new);
             ids.insert(id.clone());
         }
 
