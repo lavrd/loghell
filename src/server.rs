@@ -43,12 +43,12 @@ impl Server {
         let listener = TcpListener::bind(&self.socket_addr).await?;
         /*
            We get local address from listener instead of use from &self
-            because of we can pass local address with zero port which can be selected randomly.
+            because we can pass local address with zero port which can be selected randomly.
         */
         let local_addr = listener.local_addr()?;
         info!("socket starts at : {}", local_addr);
 
-        let re = Regex::new(r"\{\{port\}\}").unwrap();
+        let re = Regex::new(r"\{\{port}}").unwrap();
         self.dashboard_content =
             re.replace(&self.dashboard_content, &local_addr.port().to_string()).to_string();
 
