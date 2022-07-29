@@ -3,7 +3,7 @@ use std::str::from_utf8;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-use log::{debug, error, info, trace};
+use tracing::{debug, error, info, trace};
 use regex::Regex;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};

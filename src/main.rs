@@ -2,9 +2,11 @@ use std::env;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-use env_logger::{Builder, Env};
-use log::{debug, error, info};
 use tokio::sync::Mutex;
+use tracing::{debug, error, info, trace};
+use tracing_subscriber::filter::{LevelFilter, Targets};
+use tracing_subscriber::fmt;
+use tracing_subscriber::layer::SubscriberExt;
 
 use crate::shared::FnRes;
 
@@ -12,7 +14,6 @@ mod server;
 mod shared;
 mod storage;
 
-const DEFAULT_LOG_LEVEL: &str = "TRACE";
 const DEFAULT_SOCKET_ADDR: &str = "127.0.0.1:0";
 const DEFAULT_STORAGE: &str = "nonsense";
 
@@ -28,7 +29,12 @@ enum ExitCode {
 
 #[tokio::main]
 async fn main() -> FnRes<()> {
-    Builder::from_env(Env::default().default_filter_or(DEFAULT_LOG_LEVEL)).init();
+    let filter = Targets::new()
+        .with_target("loghell", tracing::Level::TRACE)
+        .with_default(LevelFilter::OFF);
+    let terminal_subscriber = fmt::Layer::new().with_writer(std::io::stdout);
+    let subscriber = tracing_subscriber::registry().with(filter).with(terminal_subscriber);
+    tracing::subscriber::set_global_default(subscriber).expect("failed to set global subscriber");
 
     let socket_addr = env::var(ENV_SOCKET_ADDR).unwrap_or_else(|_| DEFAULT_SOCKET_ADDR.to_string());
     let storage_name = env::var(ENV_STORAGE).unwrap_or_else(|_| DEFAULT_STORAGE.to_string());
@@ -58,7 +64,7 @@ async fn main() -> FnRes<()> {
     tokio::signal::ctrl_c().await?;
     info!("ctrl+c signal has been received");
 
-    println!("server open connections : {}", connection_counter.load(Ordering::Relaxed));
+    trace!("server open connections : {}", connection_counter.load(Ordering::Relaxed));
     shutdown_tx.send(())?;
     let timeout = tokio::time::sleep(tokio::time::Duration::from_secs(1));
     tokio::pin!(timeout);
