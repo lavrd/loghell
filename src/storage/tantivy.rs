@@ -131,35 +131,3 @@ impl _Storage for Tantivy {
         Ok(Some(entries))
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use crate::storage::_Storage;
-    use crate::storage::tantivy::Tantivy;
-
-    #[test]
-    fn test() {
-        let mut storage = Tantivy::new().unwrap();
-
-        let log1 = r#"{"level":"debug","message":"test-1"}"#;
-        let log2 = r#"{"level":"info","message":"test-2"}"#;
-        let log3 = r#"{"level":"error","message":"test-3"}"#;
-        let log4 = r#"{"level":"debug","message":"test-4"}"#;
-
-        storage.store(log1.as_bytes()).unwrap();
-        storage.store(log2.as_bytes()).unwrap();
-        storage.store(log3.as_bytes()).unwrap();
-        storage.store(log4.as_bytes()).unwrap();
-
-        // Wait until index will finish it's work.
-        std::thread::sleep(std::time::Duration::from_millis(250));
-
-        let find_res = storage.find("level:debug").unwrap().unwrap();
-        for data in find_res {
-            eprintln!("{}", std::str::from_utf8(&data).unwrap());
-        }
-
-        let find_res = storage.find("level:asd").unwrap();
-        assert_eq!(find_res, None)
-    }
-}
