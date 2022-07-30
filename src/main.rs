@@ -43,7 +43,7 @@ async fn main() -> FnRes<()> {
     let storage = storage::new_storage(&storage_name)?;
     let shared_storage = Arc::new(Mutex::new(storage));
     let connection_counter = Arc::new(AtomicU64::new(0));
-    let mut server = server::Server::new(
+    let server = server::Server::new(
         socket_addr,
         dashboard_content.to_string(),
         shared_storage,

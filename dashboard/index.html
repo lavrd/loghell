@@ -7,17 +7,7 @@
 </head>
 
 <body>
-<h1>Loghell</h1>
-<p>Dashboard</p>
-<script>
-  let eventSource = new EventSource("http://127.0.0.1:{{port}}/events");
-  eventSource.onmessage = (message) => {
-    console.log(message);
-  };
-  eventSource.onerror = (err) => {
-    console.error(err);
-  };
-</script>
+<p>Use terminal client to see logs.</p>
 </body>
 
 </html>

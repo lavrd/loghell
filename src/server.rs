@@ -3,11 +3,10 @@ use std::str::from_utf8;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-use tracing::{debug, error, info, trace};
-use regex::Regex;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{watch, Mutex};
+use tracing::{debug, error, info, trace};
 
 use crate::storage::Storage;
 use crate::FnRes;
@@ -39,7 +38,7 @@ impl Server {
         }
     }
 
-    pub async fn start(&mut self, shutdown_rx: watch::Receiver<()>) -> FnRes<()> {
+    pub async fn start(&self, shutdown_rx: watch::Receiver<()>) -> FnRes<()> {
         let listener = TcpListener::bind(&self.socket_addr).await?;
         /*
            We get local address from listener instead of use from &self
@@ -47,10 +46,6 @@ impl Server {
         */
         let local_addr = listener.local_addr()?;
         info!("socket starts at : {}", local_addr);
-
-        let re = Regex::new(r"\{\{port}}").unwrap();
-        self.dashboard_content =
-            re.replace(&self.dashboard_content, &local_addr.port().to_string()).to_string();
 
         let mut shutdown_rx_ = shutdown_rx.clone();
         tokio::select! {
