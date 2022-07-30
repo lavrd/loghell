@@ -117,15 +117,18 @@ impl _Storage for Tantivy {
             },
         );
         let top_docs = searcher.search(&query, &top_docs_order_by_id_asc)?;
+        if top_docs.is_empty() {
+            return Ok(None);
+        }
 
+        let mut entries: Vec<Vec<u8>> = Vec::with_capacity(top_docs.len());
         for (_score, doc_address) in top_docs {
             let retrieved_doc = searcher.doc(doc_address)?;
             let id = retrieved_doc.field_values().get(0).unwrap().value.as_bytes().unwrap();
             let data = self.storage.get(id).unwrap().unwrap();
-            eprintln!("{}", std::str::from_utf8(&data).unwrap());
+            entries.push(data.to_vec());
         }
-
-        Ok(None)
+        Ok(Some(entries))
     }
 }
 
@@ -151,6 +154,12 @@ mod tests {
         // Wait until index will finish it's work.
         std::thread::sleep(std::time::Duration::from_millis(250));
 
-        storage.find("level:debug").unwrap();
+        let find_res = storage.find("level:debug").unwrap().unwrap();
+        for data in find_res {
+            eprintln!("{}", std::str::from_utf8(&data).unwrap());
+        }
+
+        let find_res = storage.find("level:asd").unwrap();
+        assert_eq!(find_res, None)
     }
 }

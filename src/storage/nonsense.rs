@@ -74,7 +74,7 @@ impl _Storage for Nonsense {
         }
         data.sort_by(|d1, d2| d1.created_at.cmp(&d2.created_at));
 
-        let mut entries: Vec<Vec<u8>> = Vec::new();
+        let mut entries: Vec<Vec<u8>> = Vec::with_capacity(data.len());
         for d in data.iter() {
             entries.push(d.data.clone());
         }
