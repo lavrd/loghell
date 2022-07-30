@@ -82,10 +82,11 @@ impl _Storage for Nonsense {
         Ok(Some(entries))
     }
 
-    #[cfg(feature = "nonsense_find_v2")]
-    fn find(&self, _query: &str) -> FindRes {
-        Ok(None)
-    }
+    // TODO: Uncomment it when CLion will be available to handle this case.
+    // #[cfg(feature = "nonsense_find_v2")]
+    // fn find(&self, _query: &str) -> FindRes {
+    //     Ok(None)
+    // }
 }
 
 #[cfg(test)]
