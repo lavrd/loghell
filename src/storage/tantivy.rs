@@ -3,7 +3,7 @@ use tantivy::collector::TopDocs;
 use tantivy::fastfield::FastFieldReader;
 use tantivy::query::QueryParser;
 use tantivy::schema::{Field, Schema, FAST, STORED, TEXT};
-use tantivy::{DocId, Document, Index, IndexReader, IndexWriter, SegmentReader};
+use tantivy::{DocId, Document, Index, IndexReader, IndexWriter, SegmentReader, SnippetGenerator};
 use zerocopy::{AsBytes, FromBytes, Unaligned, U64};
 
 use crate::storage::{FindRes, _Storage};
@@ -57,7 +57,7 @@ impl Tantivy {
         let index = Index::create_in_ram(schema);
         let index_writer = index.writer(100_000_000)?;
         let index_reader = index.reader()?;
-        let query_parser = QueryParser::for_index(&index, vec![timestamp_field, data_field]);
+        let query_parser = QueryParser::for_index(&index, vec![data_field]);
 
         Ok(Tantivy {
             storage,
@@ -98,13 +98,7 @@ impl _Storage for Tantivy {
     }
 
     fn find(&self, query: &str) -> FindRes {
-        // We add +1 for '.'.
-        let mut temp_query: String = String::with_capacity(DATA_FIELD_NAME.len() + 1 + query.len());
-        temp_query.push_str(DATA_FIELD_NAME);
-        temp_query.push('.');
-        temp_query.push_str(query);
-        let query = self.query_parser.parse_query(&temp_query)?;
-
+        let query = self.query_parser.parse_query(query)?;
         let searcher = self.index_reader.searcher();
         let timestamp_field_: Field = self.timestamp_field;
         let top_docs_order_by_id_asc = TopDocs::with_limit(10).and_offset(0).custom_score(
@@ -127,6 +121,12 @@ impl _Storage for Tantivy {
             let id = retrieved_doc.field_values().get(0).unwrap().value.as_bytes().unwrap();
             let data = self.storage.get(id).unwrap().unwrap();
             entries.push(data.to_vec());
+
+            let snippet_generator = SnippetGenerator::create(&searcher, &*query, self.data_field)?;
+            let snippet = snippet_generator.snippet_from_doc(&retrieved_doc);
+            eprintln!("HIGHLIGHTED - {:?}", snippet.highlighted());
+            let snippet = snippet_generator.snippet(std::str::from_utf8(&data).unwrap());
+            eprintln!("HIGHLIGHTED - {:?}", snippet.highlighted());
         }
         Ok(Some(entries))
     }

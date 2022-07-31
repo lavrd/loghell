@@ -1,5 +1,12 @@
 # loghell
 
-[GoLang working version](https://github.com/lavrxxx/loghell/tree/v1.0.0).
+Simple JSON data (such as logs) indexer and viewer. Terminal UI will be implemented soon.
 
-New Rust version is in progress.
+Current version works only with JSON data.
+
+Query syntax is
+
+- `<field>:<value>`
+- `<field>.<nested-field>:<value>`
+
+[GoLang working version](https://github.com/lavrxxx/loghell/tree/v1.0.0) with web UI.
