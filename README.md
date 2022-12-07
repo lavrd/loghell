@@ -9,4 +9,4 @@ Query syntax is
 - `<field>:<value>`
 - `<field>.<nested-field>:<value>`
 
-[GoLang working version](https://github.com/lavrxxx/loghell/tree/v1.0.0) with web UI.
+[GoLang working version](https://github.com/lavrdx/loghell/tree/v1.0.0) with web UI.

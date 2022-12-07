@@ -1,12 +1,12 @@
 module example
 
-go 1.18
+go 1.19
 
 replace github.com/lavrd/loghell/go/writer => ../writer
 
 require (
 	github.com/lavrd/loghell/go/writer v0.0.0
-	github.com/rs/zerolog v1.27.0
+	github.com/rs/zerolog v1.28.0
 )
 
 require (
