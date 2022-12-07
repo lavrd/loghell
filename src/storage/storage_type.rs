@@ -4,7 +4,7 @@ const UNKNOWN: &str = "unknown";
 const NONSENSE: &str = "nonsense";
 const TANTIVY: &str = "tantivy";
 
-pub enum StorageType {
+pub(crate) enum StorageType {
     Unknown,
     Nonsense,
     Tantivy,

@@ -11,16 +11,16 @@ mod nonsense;
 mod storage_type;
 mod tantivy;
 
-pub type FindRes = FnRes<Option<Vec<Vec<u8>>>>;
+pub(crate) type FindRes = FnRes<Option<Vec<Vec<u8>>>>;
 
-pub type Storage = Box<dyn _Storage + Send>;
+pub(crate) type Storage = Box<dyn _Storage + Send>;
 
-pub trait _Storage {
+pub(crate) trait _Storage {
     fn store(&mut self, data: &[u8]) -> FnRes<()>;
     fn find(&self, query: &str) -> FindRes;
 }
 
-pub fn new_storage(storage_name: &str) -> FnRes<Storage> {
+pub(crate) fn new_storage(storage_name: &str) -> FnRes<Storage> {
     let storage_type = storage_name.into();
     let storage: Storage = match storage_type {
         StorageType::Nonsense => Box::new(Nonsense::new()),

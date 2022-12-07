@@ -29,9 +29,8 @@ enum ExitCode {
 
 #[tokio::main]
 async fn main() -> FnRes<()> {
-    let filter = Targets::new()
-        .with_target("loghell", tracing::Level::TRACE)
-        .with_default(LevelFilter::OFF);
+    let filter =
+        Targets::new().with_target("loghell", tracing::Level::TRACE).with_default(LevelFilter::OFF);
     let terminal_subscriber = fmt::Layer::new().with_writer(std::io::stdout);
     let subscriber = tracing_subscriber::registry().with(filter).with(terminal_subscriber);
     tracing::subscriber::set_global_default(subscriber).expect("failed to set global subscriber");

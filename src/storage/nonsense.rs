@@ -9,14 +9,14 @@ struct Data {
     created_at: u64,
 }
 
-pub struct Nonsense {
+pub(crate) struct Nonsense {
     entries: HashMap<u64, Data>,
     // field_name : { field_value : entry_id }
     index: HashMap<String, HashMap<String, HashSet<u64>>>,
 }
 
 impl Nonsense {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Nonsense {
             entries: HashMap::new(),
             index: HashMap::new(),
@@ -84,9 +84,8 @@ impl _Storage for Nonsense {
         Ok(Some(entries))
     }
 
-    // TODO: Uncomment it when CLion will be available to handle this case.
-    // #[cfg(feature = "nonsense_find_v2")]
-    // fn find(&self, _query: &str) -> FindRes {
-    //     Ok(None)
-    // }
+    #[cfg(feature = "nonsense_find_v2")]
+    fn find(&self, _query: &str) -> FindRes {
+        Ok(None)
+    }
 }

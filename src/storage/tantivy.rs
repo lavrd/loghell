@@ -32,7 +32,7 @@ struct Key {
     b: U64<BigEndian>,
 }
 
-pub struct Tantivy {
+pub(crate) struct Tantivy {
     storage: sled::Db,
 
     index_writer: IndexWriter,
@@ -45,7 +45,7 @@ pub struct Tantivy {
 }
 
 impl Tantivy {
-    pub fn new() -> FnRes<Self> {
+    pub(crate) fn new() -> FnRes<Self> {
         let storage = sled::open("storage")?;
 
         let mut schema_builder = Schema::builder();

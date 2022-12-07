@@ -16,7 +16,7 @@ enum ProcessDataResult {
     Close,
 }
 
-pub struct Server {
+pub(crate) struct Server {
     socket_addr: String,
     dashboard_content: String,
     storage: Arc<Mutex<Storage>>,
@@ -24,7 +24,7 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(
+    pub(crate) fn new(
         socket_addr: String,
         dashboard_content: String,
         storage: Arc<Mutex<Storage>>,
@@ -38,7 +38,7 @@ impl Server {
         }
     }
 
-    pub async fn start(&self, shutdown_rx: watch::Receiver<()>) -> FnRes<()> {
+    pub(crate) async fn start(&self, shutdown_rx: watch::Receiver<()>) -> FnRes<()> {
         let listener = TcpListener::bind(&self.socket_addr).await?;
         /*
            We get local address from listener instead of use from &self
