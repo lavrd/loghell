@@ -4,30 +4,30 @@ const UNKNOWN: &str = "unknown";
 const NONSENSE: &str = "nonsense";
 const TANTIVY: &str = "tantivy";
 
-pub(crate) enum StorageType {
+pub(crate) enum IndexType {
     Unknown,
     Nonsense,
     Tantivy,
 }
 
 // We implement Display instead of ToString because Display implements ToString.
-impl Display for StorageType {
+impl Display for IndexType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let str = match self {
-            StorageType::Unknown => UNKNOWN.to_string(),
-            StorageType::Nonsense => NONSENSE.to_string(),
-            StorageType::Tantivy => TANTIVY.to_string(),
+            IndexType::Unknown => UNKNOWN.to_string(),
+            IndexType::Nonsense => NONSENSE.to_string(),
+            IndexType::Tantivy => TANTIVY.to_string(),
         };
         write!(f, "{}", str)
     }
 }
 
-impl From<&str> for StorageType {
+impl From<&str> for IndexType {
     fn from(str: &str) -> Self {
         match str {
-            NONSENSE => StorageType::Nonsense,
-            TANTIVY => StorageType::Tantivy,
-            _ => StorageType::Unknown,
+            NONSENSE => IndexType::Nonsense,
+            TANTIVY => IndexType::Tantivy,
+            _ => IndexType::Unknown,
         }
     }
 }

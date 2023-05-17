@@ -1,8 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
+use crate::index::{FindResult, _Index};
 use crate::shared;
-use crate::shared::FnRes;
-use crate::storage::{FindRes, _Storage};
+
+use super::error::Error;
 
 struct Data {
     data: Vec<u8>,
@@ -24,15 +25,19 @@ impl Nonsense {
     }
 }
 
-impl _Storage for Nonsense {
-    fn store(&mut self, data: &[u8]) -> FnRes<()> {
+impl _Index for Nonsense {
+    fn store(&mut self, data: &[u8]) -> Result<(), Error> {
         let id = fastrand::u64(..);
-        let data_as_value: serde_json::Value = serde_json::from_slice(data)?;
-
+        let data_as_value: serde_json::Value =
+            serde_json::from_slice(data).map_err(|e| Error::FailedDecodeData(e.to_string()))?;
         if !data_as_value.is_object() {
-            return Err("nonsense storage can't work without objects".into());
+            return Err(Error::FailedDecodeData(
+                "nonsense storage can't work without objects".to_string(),
+            ));
         }
-        let obj = data_as_value.as_object().ok_or("failed to get data as object")?;
+        let obj = data_as_value
+            .as_object()
+            .ok_or(Error::FailedDecodeData("failed to get data as object".to_string()))?;
         for (name, value) in obj.iter() {
             let value = value.to_string().replace('\"', "");
 
@@ -45,7 +50,8 @@ impl _Storage for Nonsense {
             id,
             Data {
                 data: data.to_vec(),
-                created_at: shared::now_as_nanos_u64()?,
+                created_at: shared::now_as_nanos_u64()
+                    .map_err(|e| Error::Internal(e.to_string()))?,
             },
         );
 
@@ -53,10 +59,10 @@ impl _Storage for Nonsense {
     }
 
     #[cfg(feature = "nonsense_find_v1")]
-    fn find(&self, query: &str) -> FindRes {
+    fn find(&self, query: &str) -> Result<FindResult, Error> {
         let split: Vec<&str> = query.split(':').collect();
         if split.len() != 2 {
-            return Err("invalid query syntax".into());
+            return Err(Error::InvalidQuerySyntax);
         }
         let key: &str = split[0];
         let value: &str = split[1];
@@ -72,11 +78,10 @@ impl _Storage for Nonsense {
             return Ok(None);
         }
 
-        // TODO: What about time complexity? It looks very bad.
         let mut entries: Vec<Vec<u8>> = Vec::with_capacity(ids.len());
         let mut positions: Vec<u64> = Vec::with_capacity(ids.len());
         for id in ids {
-            let entry = self.entries.get(id).ok_or("data not found by entry id")?;
+            let entry = self.entries.get(id).ok_or(Error::NotFound)?;
             let pos = positions.binary_search(&entry.created_at).unwrap_or_else(|e| e);
             positions.insert(pos, entry.created_at);
             entries.insert(pos, entry.data.clone());

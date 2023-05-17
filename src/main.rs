@@ -10,9 +10,11 @@ use tracing_subscriber::layer::SubscriberExt;
 
 use crate::shared::FnRes;
 
+mod index;
 mod server;
 mod shared;
 mod storage;
+mod config;
 
 const DEFAULT_SOCKET_ADDR: &str = "127.0.0.1:0";
 const DEFAULT_STORAGE: &str = "nonsense";

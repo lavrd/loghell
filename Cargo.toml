@@ -14,6 +14,7 @@ zerocopy = { version = "0.6.1", features = [], default-features = false }
 serde = { version = "1.0.163", features = [], default-features = false }
 serde_json = { version = "1.0.96", features = [], default-features = false }
 tantivy = { version = "0.19.2", features = [], default-features = false }
+thiserror = { version = "1.0.40", features = [], default-features = false }
 
 [features]
 default = ["nonsense_find_v1"]
