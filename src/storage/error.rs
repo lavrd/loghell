@@ -1,5 +1,3 @@
-// todo: read how we need to implement errors better and refactor.
-
 use thiserror::Error;
 
 #[derive(Error, Debug)]

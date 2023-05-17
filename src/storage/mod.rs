@@ -1,11 +1,11 @@
-use error::Error;
 use tracing::info;
 
-use self::storage_type::StorageType;
+use error::Error;
+use storage_type::StorageType;
 
 mod error;
-pub(crate) mod file;
-pub(crate) mod in_memory;
+mod file;
+mod in_memory;
 mod storage_type;
 
 pub(crate) trait Storage {

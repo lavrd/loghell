@@ -39,7 +39,6 @@ mod tests {
     const LOG3: &str = r#"{"level":"error","message":"test-3"}"#;
     const LOG4: &str = r#"{"level":"debug","message":"test-4"}"#;
 
-    #[ignore = "tantivy is not ready"]
     #[test]
     fn test_tantivy() {
         let mut index = new_index(IndexType::Tantivy.to_string().as_str()).unwrap();
