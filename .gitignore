@@ -2,6 +2,6 @@
 .vscode
 .fleet
 
-/target
+**/.DS_Store
 
-/storage
+/target
