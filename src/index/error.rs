@@ -1,5 +1,3 @@
-// todo: read how we need to implement errors better and refactor.
-
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -7,9 +5,9 @@ pub(crate) enum Error {
     #[error("unknown index type: {0}")]
     UnknownIndexType(String),
     #[error("failed to decode data: {0}")]
-    FailedDecodeData(String),
+    DecodeData(String),
     #[error("invalid query syntax")]
-    InvalidQuerySyntax,
+    QuerySyntax,
     #[error("data not found")]
     NotFound,
     #[error("internal error: {0}")]

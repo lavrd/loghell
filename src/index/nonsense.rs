@@ -13,8 +13,7 @@ struct Data {
 #[cfg(feature = "index_nonsense")]
 pub(super) struct Nonsense {
     entries: HashMap<u64, Data>,
-    // field_name : { field_value : entry_id }
-    index: HashMap<String, HashMap<String, HashSet<u64>>>,
+    index: HashMap<String, HashMap<String, HashSet<u64>>>, // field_name : { field_value : entry_id }
 }
 
 impl Nonsense {
@@ -30,15 +29,15 @@ impl Index for Nonsense {
     fn index(&mut self, data: &[u8]) -> Result<(), Error> {
         let id = fastrand::u64(..);
         let data_as_value: serde_json::Value =
-            serde_json::from_slice(data).map_err(|e| Error::FailedDecodeData(e.to_string()))?;
+            serde_json::from_slice(data).map_err(|e| Error::DecodeData(e.to_string()))?;
         if !data_as_value.is_object() {
-            return Err(Error::FailedDecodeData(
+            return Err(Error::DecodeData(
                 "nonsense storage can't work without objects".to_string(),
             ));
         }
         let obj = data_as_value
             .as_object()
-            .ok_or(Error::FailedDecodeData("failed to get data as object".to_string()))?;
+            .ok_or(Error::DecodeData("failed to get data as object".to_string()))?;
         for (name, value) in obj.iter() {
             let value = value.to_string().replace('\"', "");
 
@@ -62,7 +61,7 @@ impl Index for Nonsense {
     fn find(&self, query: &str) -> Result<FindResult, Error> {
         let split: Vec<&str> = query.split(':').collect();
         if split.len() != 2 {
-            return Err(Error::InvalidQuerySyntax);
+            return Err(Error::QuerySyntax);
         }
         let key: &str = split[0];
         let value: &str = split[1];

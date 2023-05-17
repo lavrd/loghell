@@ -44,7 +44,6 @@ mod tests {
     fn test_tantivy() {
         let mut index = new_index(IndexType::Tantivy.to_string().as_str()).unwrap();
         fill_index(&mut index);
-        std::thread::sleep(std::time::Duration::from_millis(250));
         test_index(&index);
     }
 
@@ -53,7 +52,6 @@ mod tests {
         let mut index = new_index(IndexType::Nonsense.to_string().as_str()).unwrap();
         fill_index(&mut index);
         test_index(&index);
-
         {
             let res = index.index(r#"0"#.as_bytes());
             assert!(res.is_err());
@@ -96,4 +94,6 @@ mod tests {
             assert_eq!(find_res, None);
         }
     }
+
+    // todo: add test with nested objects like "asd.asd"
 }
