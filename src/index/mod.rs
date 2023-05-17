@@ -7,6 +7,7 @@ use nonsense::Nonsense;
 mod error;
 mod index_type;
 mod nonsense;
+mod tantivy;
 
 pub(crate) type FindResult = Option<Vec<Vec<u8>>>;
 
@@ -24,7 +25,7 @@ pub(crate) fn new_index(index_name: &str) -> Result<Index, Error> {
     let index: Index = match index_type {
         IndexType::Nonsense => Box::new(Nonsense::new()),
         IndexType::Tantivy => unimplemented!(),
-        IndexType::Unknown => return Err(Error::UnknownIndexType),
+        IndexType::Unknown => return Err(Error::UnknownIndexType(index_name.to_string())),
     };
     info!(index_type = &index_type.to_string(), "using as an index");
     Ok(index)
@@ -44,32 +45,32 @@ mod tests {
     #[test]
     fn test_tantivy() {
         let mut index = new_index(IndexType::Tantivy.to_string().as_str()).unwrap();
-        fill_storage(&mut index);
+        fill_index(&mut index);
         std::thread::sleep(std::time::Duration::from_millis(250));
-        test_storage(&index);
+        test_index(&index);
     }
 
     #[test]
     fn test_nonsense() {
         let mut index = new_index(IndexType::Nonsense.to_string().as_str()).unwrap();
-        fill_storage(&mut index);
-        test_storage(&index);
+        fill_index(&mut index);
+        test_index(&index);
 
         {
             let res = index.store(r#"0"#.as_bytes());
             assert!(res.is_err());
-            assert_eq!(res.unwrap_err().to_string(), "nonsense storage can't work without objects");
+            assert_eq!(res.unwrap_err().to_string(), "nonsense index can't work without objects");
         }
     }
 
-    fn fill_storage(index: &mut Index) {
+    fn fill_index(index: &mut Index) {
         index.store(LOG1.as_bytes()).unwrap();
         index.store(LOG2.as_bytes()).unwrap();
         index.store(LOG3.as_bytes()).unwrap();
         index.store(LOG4.as_bytes()).unwrap();
     }
 
-    fn test_storage(index: &Index) {
+    fn test_index(index: &Index) {
         {
             let find_res = index.find("level:debug").unwrap();
             assert_ne!(find_res, None);
