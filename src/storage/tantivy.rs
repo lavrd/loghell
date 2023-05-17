@@ -1,6 +1,5 @@
 use byteorder::BigEndian;
 use tantivy::collector::TopDocs;
-use tantivy::fastfield::FastFieldReader;
 use tantivy::query::QueryParser;
 use tantivy::schema::{Field, Schema, FAST, STORED, TEXT};
 use tantivy::{DocId, Document, Index, IndexReader, IndexWriter, SegmentReader, SnippetGenerator};
@@ -105,7 +104,7 @@ impl _Storage for Tantivy {
             move |segment_reader: &SegmentReader| {
                 let timestamp_reader = segment_reader.fast_fields().u64(timestamp_field_).unwrap();
                 move |doc: DocId| {
-                    let timestamp: u64 = timestamp_reader.get(doc);
+                    let timestamp: u64 = timestamp_reader.get_val(doc);
                     std::cmp::Reverse(timestamp)
                 }
             },
