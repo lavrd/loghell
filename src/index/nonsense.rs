@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::index::{FindResult, _Index};
+use crate::index::{FindResult, Index};
 use crate::shared;
 
 use super::error::Error;
@@ -10,14 +10,15 @@ struct Data {
     created_at: u64,
 }
 
-pub(crate) struct Nonsense {
+#[cfg(feature = "index_nonsense")]
+pub(super) struct Nonsense {
     entries: HashMap<u64, Data>,
     // field_name : { field_value : entry_id }
     index: HashMap<String, HashMap<String, HashSet<u64>>>,
 }
 
 impl Nonsense {
-    pub(crate) fn new() -> Self {
+    pub(super) fn new() -> Self {
         Nonsense {
             entries: HashMap::new(),
             index: HashMap::new(),
@@ -25,8 +26,8 @@ impl Nonsense {
     }
 }
 
-impl _Index for Nonsense {
-    fn store(&mut self, data: &[u8]) -> Result<(), Error> {
+impl Index for Nonsense {
+    fn index(&mut self, data: &[u8]) -> Result<(), Error> {
         let id = fastrand::u64(..);
         let data_as_value: serde_json::Value =
             serde_json::from_slice(data).map_err(|e| Error::FailedDecodeData(e.to_string()))?;
@@ -58,7 +59,6 @@ impl _Index for Nonsense {
         Ok(())
     }
 
-    #[cfg(feature = "nonsense_find_v1")]
     fn find(&self, query: &str) -> Result<FindResult, Error> {
         let split: Vec<&str> = query.split(':').collect();
         if split.len() != 2 {
@@ -87,10 +87,5 @@ impl _Index for Nonsense {
             entries.insert(pos, entry.data.clone());
         }
         Ok(Some(entries))
-    }
-
-    #[cfg(feature = "nonsense_find_v2")]
-    fn find(&self, _query: &str) -> FindRes {
-        Ok(None)
     }
 }

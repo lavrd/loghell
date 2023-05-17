@@ -17,6 +17,5 @@ tantivy = { version = "0.19.2", features = [], default-features = false }
 thiserror = { version = "1.0.40", features = [], default-features = false }
 
 [features]
-default = ["nonsense_find_v1"]
-nonsense_find_v1 = []
-nonsense_find_v2 = []
+default = ["index_nonsense"]
+index_nonsense = []

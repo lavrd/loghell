@@ -1,8 +1,10 @@
 use tracing::info;
 
+use crate::index::nonsense::Nonsense;
+use crate::index::tantivy::Tantivy;
+
 use error::Error;
 use index_type::IndexType;
-use nonsense::Nonsense;
 
 mod error;
 mod index_type;
@@ -11,20 +13,16 @@ mod tantivy;
 
 pub(crate) type FindResult = Option<Vec<Vec<u8>>>;
 
-// todo: add comment why we need Send
-// todo: implement without box dyn but return just impl?
-pub(crate) type Index = Box<dyn _Index + Send>;
-
-pub(crate) trait _Index {
-    fn store(&mut self, data: &[u8]) -> Result<(), Error>;
+pub(crate) trait Index {
+    fn index(&mut self, data: &[u8]) -> Result<(), Error>;
     fn find(&self, query: &str) -> Result<FindResult, Error>;
 }
 
-pub(crate) fn new_index(index_name: &str) -> Result<Index, Error> {
+pub(crate) fn new_index(index_name: &str) -> Result<impl Index, Error> {
     let index_type = index_name.into();
     let index: Index = match index_type {
-        IndexType::Nonsense => Box::new(Nonsense::new()),
-        IndexType::Tantivy => unimplemented!(),
+        IndexType::Nonsense => Nonsense::new(),
+        IndexType::Tantivy => Tantivy::new(),
         IndexType::Unknown => return Err(Error::UnknownIndexType(index_name.to_string())),
     };
     info!(index_type = &index_type.to_string(), "using as an index");
@@ -57,20 +55,20 @@ mod tests {
         test_index(&index);
 
         {
-            let res = index.store(r#"0"#.as_bytes());
+            let res = index.index(r#"0"#.as_bytes());
             assert!(res.is_err());
             assert_eq!(res.unwrap_err().to_string(), "nonsense index can't work without objects");
         }
     }
 
-    fn fill_index(index: &mut Index) {
-        index.store(LOG1.as_bytes()).unwrap();
-        index.store(LOG2.as_bytes()).unwrap();
-        index.store(LOG3.as_bytes()).unwrap();
-        index.store(LOG4.as_bytes()).unwrap();
+    fn fill_index(mut index: impl Index) {
+        index.index(LOG1.as_bytes()).unwrap();
+        index.index(LOG2.as_bytes()).unwrap();
+        index.index(LOG3.as_bytes()).unwrap();
+        index.index(LOG4.as_bytes()).unwrap();
     }
 
-    fn test_index(index: &Index) {
+    fn test_index(index: impl Index) {
         {
             let find_res = index.find("level:debug").unwrap();
             assert_ne!(find_res, None);
