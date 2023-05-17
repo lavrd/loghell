@@ -13,7 +13,7 @@ pub(crate) trait Storage {
     fn read(&self, key: &str) -> Result<&[u8], Error>;
 }
 
-pub(crate) fn new_storage(storage_name: &str) -> Result<impl Storage, Error> {
+pub(super) fn new_storage(storage_name: &str) -> Result<impl Storage, Error> {
     let storage_type: storage_type::StorageType = storage_name.into();
     let storage: Storage = match storage_type {
         StorageType::InMemory => unimplemented!(),

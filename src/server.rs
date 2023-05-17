@@ -17,23 +17,14 @@ enum ProcessDataResult {
 }
 
 pub(crate) struct Server {
-    socket_addr: String,
     dashboard_content: String,
-    storage: Arc<Mutex<Storage>>,
     connection_counter: Arc<AtomicU64>,
 }
 
 impl Server {
-    pub(crate) fn new(
-        socket_addr: String,
-        dashboard_content: String,
-        storage: Arc<Mutex<Storage>>,
-        connection_counter: Arc<AtomicU64>,
-    ) -> Self {
+    pub(crate) fn new(dashboard_content: String, connection_counter: Arc<AtomicU64>) -> Self {
         Server {
-            socket_addr,
             dashboard_content,
-            storage,
             connection_counter,
         }
     }

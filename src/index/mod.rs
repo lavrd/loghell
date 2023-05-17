@@ -18,7 +18,7 @@ pub(crate) trait Index {
     fn find(&self, query: &str) -> Result<FindResult, Error>;
 }
 
-pub(crate) fn new_index(index_name: &str) -> Result<impl Index, Error> {
+pub(super) fn new_index(index_name: &str) -> Result<impl Index, Error> {
     let index_type = index_name.into();
     let index: Index = match index_type {
         IndexType::Nonsense => Nonsense::new(),
