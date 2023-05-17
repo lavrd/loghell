@@ -1,6 +1,7 @@
 package writer
 
 import (
+	"fmt"
 	"net"
 )
 
@@ -10,10 +11,12 @@ type ZerologWriter struct {
 	conn net.Conn
 }
 
-// NewZerolog returns new zerolog writer.
 func NewZerolog(loghellEndpoint string) (*ZerologWriter, error) {
 	conn, err := net.Dial("tcp", loghellEndpoint)
-	return &ZerologWriter{conn: conn}, err
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to loghell: %w", err)
+	}
+	return &ZerologWriter{conn: conn}, nil
 }
 
 func (w *ZerologWriter) Write(p []byte) (int, error) {
@@ -21,7 +24,6 @@ func (w *ZerologWriter) Write(p []byte) (int, error) {
 	return len(p), err
 }
 
-// Close closes connection with loghell.
 func (w *ZerologWriter) Close() error {
 	return w.conn.Close()
 }
