@@ -8,16 +8,18 @@ mod file;
 mod in_memory;
 mod storage_type;
 
-pub(crate) trait Storage {
+pub(crate) type Storage = Box<dyn _Storage + Send + Sync>;
+
+pub(crate) trait _Storage {
     fn write(&mut self, key: &str, data: &[u8]) -> Result<(), Error>;
     fn read(&self, key: &str) -> Result<&[u8], Error>;
 }
 
-pub(super) fn new_storage(storage_name: &str) -> Result<impl Storage, Error> {
+pub(super) fn new_storage(storage_name: &str) -> Result<Storage, Error> {
     let storage_type: storage_type::StorageType = storage_name.into();
     let storage: Storage = match storage_type {
-        StorageType::InMemory => unimplemented!(),
-        StorageType::File => unimplemented!(),
+        StorageType::InMemory => Box::new(in_memory::InMemory::new()),
+        StorageType::File => Box::new(file::File::new()?),
         StorageType::Unknown => return Err(Error::UnknownStorageType(storage_name.to_string())),
     };
     info!(storage_type = &storage_type.to_string(), "using as a storage");
@@ -26,7 +28,7 @@ pub(super) fn new_storage(storage_name: &str) -> Result<impl Storage, Error> {
 
 #[cfg(test)]
 mod tests {
-    use super::Storage;
+    use super::_Storage;
 
     #[test]
     fn test_in_memory() {}
@@ -34,5 +36,5 @@ mod tests {
     #[test]
     fn test_file() {}
 
-    fn test_storage(storage: impl Storage) {}
+    fn test_storage(storage: impl _Storage) {}
 }

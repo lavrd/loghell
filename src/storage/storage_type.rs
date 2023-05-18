@@ -10,7 +10,6 @@ pub(crate) enum StorageType {
     File,
 }
 
-// We implement Display instead of ToString because Display implements ToString.
 impl Display for StorageType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let str = match self {

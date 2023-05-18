@@ -1,4 +1,4 @@
-use crate::index::{FindResult, Index};
+use crate::index::{FindResult, _Index};
 
 use super::error::Error;
 
@@ -10,7 +10,7 @@ impl Tantivy {
     }
 }
 
-impl Index for Tantivy {
+impl _Index for Tantivy {
     fn index(&mut self, data: &[u8]) -> Result<(), Error> {
         todo!()
     }

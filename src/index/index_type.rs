@@ -10,7 +10,6 @@ pub(crate) enum IndexType {
     Nonsense,
 }
 
-// We implement Display instead of ToString because Display implements ToString.
 impl Display for IndexType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let str = match self {

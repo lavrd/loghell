@@ -1,4 +1,4 @@
-use crate::storage::Storage;
+use crate::storage::_Storage;
 
 use super::error::Error;
 
@@ -10,7 +10,7 @@ impl File {
     }
 }
 
-impl Storage for File {
+impl _Storage for File {
     fn write(&mut self, key: &str, data: &[u8]) -> Result<(), Error> {
         todo!()
     }

@@ -4,7 +4,7 @@ const ENV_SOCKET_ADDR: &str = "SOCKET_ADDR";
 const ENV_INDEX_NAME: &str = "INDEX";
 const ENV_STORAGE_NAME: &str = "STORAGE";
 
-const DEFAULT_SOCKET_ADDR: &str = "127.0.0.1:0";
+const DEFAULT_SOCKET_ADDR: &str = "127.0.0.1:6677";
 const DEFAULT_INDEX_NAME: &str = "nonsense";
 const DEFAULT_STORAGE_NAME: &str = "in_memory";
 

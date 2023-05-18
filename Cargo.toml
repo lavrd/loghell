@@ -17,5 +17,8 @@ tantivy = { version = "0.19.2", features = [], default-features = false }
 thiserror = { version = "1.0.40", features = [], default-features = false }
 
 [features]
-default = ["index_nonsense"]
+default = ["index_nonsense", "index_tantivy", "storage_in_memory", "storage_file"]
 index_nonsense = []
+index_tantivy = []
+storage_in_memory = []
+storage_file = []

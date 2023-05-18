@@ -1,31 +1,37 @@
-use std::env;
+use std::process::ExitCode;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-use tokio::sync::Mutex;
+use tokio::task::JoinHandle;
 use tracing::{debug, error, info, trace};
 use tracing_subscriber::filter::{LevelFilter, Targets};
 use tracing_subscriber::fmt;
 use tracing_subscriber::layer::SubscriberExt;
 
-use crate::shared::FnRes;
-
 mod config;
 mod index;
+mod log_storage;
 mod server;
 mod shared;
 mod storage;
 
 #[repr(u8)]
-enum ExitCode {
+enum ECode {
     Ok = 0,
     FailedToStartDaemon = 201,
     FailedToStopDaemon = 202,
 }
 
+impl From<ECode> for std::process::ExitCode {
+    fn from(value: ECode) -> Self {
+        todo!()
+    }
+}
+
 #[tokio::main]
-async fn main() -> FnRes<()> {
+async fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
     let dashboard_content = include_str!("../dashboard/index.html");
+
     let cfg = config::Config::new();
 
     let filter =
@@ -34,26 +40,20 @@ async fn main() -> FnRes<()> {
     let subscriber = tracing_subscriber::registry().with(filter).with(terminal_subscriber);
     tracing::subscriber::set_global_default(subscriber).expect("failed to set global subscriber");
 
-    let index = index::new_index(&cfg.index_name)?;
-    let storage = storage::new_storage(&cfg.storage_name)?;
+    let log_storage = log_storage::LogStorage::new(&cfg.index_name, &cfg.storage_name)?;
 
     let connection_counter = Arc::new(AtomicU64::new(0));
-    let server = server::Server::new(
-        &cfg.socket_addr,
-        dashboard_content.to_string(),
-        shared_storage,
-        connection_counter.clone(),
-    );
+    let server =
+        server::Server::new(dashboard_content.to_string(), connection_counter.clone(), log_storage);
     let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(());
 
-    tokio::spawn(async move {
-        match server.start(shutdown_rx).await {
+    let socket_addr = cfg.socket_addr;
+    let res: JoinHandle<ECode> = tokio::spawn(async move {
+        match server.start(&socket_addr, shutdown_rx).await {
             Ok(()) => debug!("server has been stopped successfully"),
-            Err(e) => {
-                error!("failed to start server : {}", e);
-                std::process::exit(ExitCode::FailedToStartDaemon as i32);
-            }
+            Err(e) => error!("failed to start server : {}", e),
         }
+        ECode::FailedToStartDaemon
     });
 
     tokio::signal::ctrl_c().await?;
@@ -66,12 +66,16 @@ async fn main() -> FnRes<()> {
     tokio::select! {
         _ = &mut timeout => {
             error!("server stopping is timed out");
-            std::process::exit(ExitCode::FailedToStopDaemon as i32);
+            return Ok(ECode::FailedToStopDaemon.into())
         }
         _ = shutdown_tx.closed() => {
             debug!("server successfully stopped");
         }
     }
 
-    std::process::exit(ExitCode::Ok as i32);
+    // todo: use it more good
+    let start_exit_code: std::process::ExitCode = res.await?.into();
+    eprintln!("{:?}", start_exit_code);
+
+    Ok(ECode::Ok.into())
 }

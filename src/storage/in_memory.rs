@@ -1,16 +1,16 @@
-use crate::storage::Storage;
+use crate::storage::_Storage;
 
 use super::error::Error;
 
 pub(super) struct InMemory {}
 
 impl InMemory {
-    pub(super) fn new() -> Result<Self, Error> {
+    pub(super) fn new() -> Self {
         todo!()
     }
 }
 
-impl Storage for InMemory {
+impl _Storage for InMemory {
     fn write(&mut self, key: &str, data: &[u8]) -> Result<(), Error> {
         todo!()
     }

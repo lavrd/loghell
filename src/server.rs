@@ -5,11 +5,10 @@ use std::sync::Arc;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::{watch, Mutex};
+use tokio::sync::watch;
 use tracing::{debug, error, info, trace};
 
-use crate::storage::Storage;
-use crate::FnRes;
+use crate::log_storage;
 
 enum ProcessDataResult {
     Ok,
@@ -19,18 +18,28 @@ enum ProcessDataResult {
 pub(crate) struct Server {
     dashboard_content: String,
     connection_counter: Arc<AtomicU64>,
+    log_storage: log_storage::LogStorage,
 }
 
 impl Server {
-    pub(crate) fn new(dashboard_content: String, connection_counter: Arc<AtomicU64>) -> Self {
+    pub(crate) fn new(
+        dashboard_content: String,
+        connection_counter: Arc<AtomicU64>,
+        log_storage: log_storage::LogStorage,
+    ) -> Self {
         Server {
             dashboard_content,
             connection_counter,
+            log_storage,
         }
     }
 
-    pub(crate) async fn start(&self, shutdown_rx: watch::Receiver<()>) -> FnRes<()> {
-        let listener = TcpListener::bind(&self.socket_addr).await?;
+    pub(crate) async fn start(
+        &self,
+        socket_addr: &str,
+        shutdown_rx: watch::Receiver<()>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let listener = TcpListener::bind(socket_addr).await?;
         /*
            We get local address from listener instead of use from &self
             because we can pass local address with zero port which can be selected randomly.
@@ -48,7 +57,11 @@ impl Server {
         }
     }
 
-    async fn accept(&self, listener: TcpListener, shutdown_rx: watch::Receiver<()>) -> FnRes<()> {
+    async fn accept(
+        &self,
+        listener: TcpListener,
+        shutdown_rx: watch::Receiver<()>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         loop {
             let (socket, socket_addr) = listener.accept().await?;
             info!("new client; ip : {}", socket_addr);
@@ -59,7 +72,6 @@ impl Server {
                 socket_addr,
                 shutdown_rx.clone(),
                 self.dashboard_content.clone(),
-                self.storage.clone(),
                 self.connection_counter.clone(),
             );
             tokio::spawn(async move {
@@ -82,7 +94,6 @@ struct Connection {
     socket_addr: SocketAddr,
     shutdown_rx: watch::Receiver<()>,
     dashboard_content: String,
-    storage: Arc<Mutex<Storage>>,
     connection_counter: Arc<AtomicU64>,
 }
 
@@ -92,7 +103,6 @@ impl Connection {
         socket_addr: SocketAddr,
         shutdown_rx: watch::Receiver<()>,
         dashboard_content: String,
-        storage: Arc<Mutex<Storage>>,
         connection_counter: Arc<AtomicU64>,
     ) -> Self {
         Connection {
@@ -100,7 +110,6 @@ impl Connection {
             socket_addr,
             shutdown_rx,
             dashboard_content,
-            storage,
             connection_counter,
         }
     }
@@ -133,7 +142,7 @@ impl Connection {
         trace!("we have moved from select in Connection.process_socket");
     }
 
-    async fn read_data(&mut self) -> FnRes<()> {
+    async fn read_data(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         loop {
             let mut buf = [0; 1024];
             // Read data from socket.
@@ -166,7 +175,11 @@ impl Connection {
         }
     }
 
-    async fn process_data(&mut self, n: usize, buf: &[u8]) -> FnRes<ProcessDataResult> {
+    async fn process_data(
+        &mut self,
+        n: usize,
+        buf: &[u8],
+    ) -> Result<ProcessDataResult, Box<dyn std::error::Error>> {
         match n {
             n if n == 0 => {
                 trace!("connection with {} client closed", self.socket_addr);
@@ -191,7 +204,7 @@ impl Connection {
         }
     }
 
-    async fn handle_dashboard(&mut self) -> FnRes<()> {
+    async fn handle_dashboard(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let response = format!(
             "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}",
             self.dashboard_content.len(),
@@ -203,7 +216,7 @@ impl Connection {
         Ok(())
     }
 
-    async fn handle_log(&self, buf: &[u8], n: usize) -> FnRes<()> {
+    async fn handle_log(&self, buf: &[u8], n: usize) -> Result<(), Box<dyn std::error::Error>> {
         // We use n-2 to remove /r/n at the end of data.
         let truncated_buf: &[u8] = &buf[0..n - 2];
 
@@ -211,11 +224,11 @@ impl Connection {
         let data = from_utf8(truncated_buf)?;
         info!("new data received from {} client : {:?}", self.socket_addr, data);
 
-        self.storage.lock().await.store(truncated_buf)?;
+        // self.storage.lock().await.store(truncated_buf)?;
         Ok(())
     }
 
-    async fn handle_sse(&mut self) -> FnRes<()> {
+    async fn handle_sse(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let response = "HTTP/1.1 200 OK
 Connection: keep-alive
 Content-Type: text/event-stream
@@ -238,7 +251,7 @@ Cache-Control: no-cache";
         }
     }
 
-    async fn send_sse_data(&mut self) -> FnRes<()> {
+    async fn send_sse_data(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         loop {
             match self.socket.write_all(b"data\n\n").await {
                 Ok(()) => Ok(()),

@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::index::{FindResult, Index};
+use crate::index::{FindResult, _Index};
 use crate::shared;
 
 use super::error::Error;
@@ -10,7 +10,6 @@ struct Data {
     created_at: u64,
 }
 
-#[cfg(feature = "index_nonsense")]
 pub(super) struct Nonsense {
     entries: HashMap<u64, Data>,
     index: HashMap<String, HashMap<String, HashSet<u64>>>, // field_name : { field_value : entry_id }
@@ -25,7 +24,7 @@ impl Nonsense {
     }
 }
 
-impl Index for Nonsense {
+impl _Index for Nonsense {
     fn index(&mut self, data: &[u8]) -> Result<(), Error> {
         let id = fastrand::u64(..);
         let data_as_value: serde_json::Value =
@@ -38,10 +37,29 @@ impl Index for Nonsense {
         let obj = data_as_value
             .as_object()
             .ok_or(Error::DecodeData("failed to get data as object".to_string()))?;
+
         for (name, value) in obj.iter() {
-            let value = value.to_string().replace('\"', "");
+            if value.is_object() {
+                // todo: we do cast to object twice, so move it
+                // todo: same for index logic
+                // todo: write in readme that we supports only one nesting with nonsense storage
+                for (nested_name, nested_value) in value
+                    .as_object()
+                    .ok_or(Error::DecodeData("failed to get data as object".to_string()))?
+                {
+                    let name = format!("{name}.{nested_name}");
+                    let ids_by_values =
+                        self.index.entry(name.to_string()).or_insert_with(HashMap::new);
+
+                    let value = nested_value.to_string().replace('\"', "");
+                    let ids = ids_by_values.entry(value.to_string()).or_insert_with(HashSet::new);
+                    ids.insert(id);
+                }
+                continue;
+            }
 
             let ids_by_values = self.index.entry(name.to_string()).or_insert_with(HashMap::new);
+            let value = value.to_string().replace('\"', "");
             let ids = ids_by_values.entry(value.to_string()).or_insert_with(HashSet::new);
             ids.insert(id);
         }
