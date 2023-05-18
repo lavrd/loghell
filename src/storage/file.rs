@@ -19,7 +19,7 @@ impl _Storage for File {
         todo!()
     }
 
-    fn list(&self) -> Result<Vec<u8>, Error> {
+    fn list(&self) -> Result<Vec<(Key, Vec<u8>)>, Error> {
         todo!()
     }
 }

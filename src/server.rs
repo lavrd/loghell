@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::watch;
+use tokio::sync::{watch, Mutex};
 use tracing::{debug, error, info, trace};
 
 use crate::log_storage;
@@ -15,17 +15,19 @@ enum ProcessDataResult {
     Close,
 }
 
+type LogStoragePointer = Arc<Mutex<log_storage::LogStorage>>;
+
 pub(crate) struct Server {
     dashboard_content: String,
     connection_counter: Arc<AtomicU64>,
-    log_storage: Arc<log_storage::LogStorage>,
+    log_storage: LogStoragePointer,
 }
 
 impl Server {
     pub(crate) fn new(
         dashboard_content: String,
         connection_counter: Arc<AtomicU64>,
-        log_storage: Arc<log_storage::LogStorage>,
+        log_storage: LogStoragePointer,
     ) -> Self {
         Server {
             dashboard_content,
@@ -96,7 +98,7 @@ struct Connection {
     shutdown_rx: watch::Receiver<()>,
     dashboard_content: String, // todo: do not store as string because of coping?
     connection_counter: Arc<AtomicU64>,
-    log_storage: Arc<log_storage::LogStorage>,
+    log_storage: LogStoragePointer,
 }
 
 impl Connection {
@@ -106,7 +108,7 @@ impl Connection {
         shutdown_rx: watch::Receiver<()>,
         dashboard_content: String,
         connection_counter: Arc<AtomicU64>,
-        log_storage: Arc<log_storage::LogStorage>,
+        log_storage: LogStoragePointer,
     ) -> Self {
         Connection {
             socket,
@@ -228,8 +230,7 @@ impl Connection {
         let data = from_utf8(truncated_buf)?;
         info!("new data received from {} client : {:?}", self.socket_addr, data);
 
-        // self.storage.lock().await.store(truncated_buf)?;
-        Ok(())
+        self.log_storage.lock().await.store(truncated_buf).await
     }
 
     async fn handle_sse(&mut self) -> Result<(), Box<dyn std::error::Error>> {

@@ -68,6 +68,6 @@ impl _Index for Nonsense {
         let key: &str = split[0];
         let value: &str = split[1];
         let ids = self.index.get(key).ok_or(Error::NotFound)?.get(value).ok_or(Error::NotFound)?;
-        Ok(ids.into_iter().map(|x| *x).collect())
+        Ok(ids.iter().copied().collect())
     }
 }

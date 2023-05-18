@@ -14,7 +14,7 @@ impl LogStorage {
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let index = index::new_index(index_name)?;
         let storage = storage::new_storage(storage_name)?;
-        let log_storage = Self { index, storage };
+        let mut log_storage = Self { index, storage };
         log_storage.restore()?;
         Ok(log_storage)
     }
@@ -30,8 +30,11 @@ impl LogStorage {
         .await
     }
 
-    fn restore(&self) -> Result<(), Box<dyn std::error::Error>> {
+    fn restore(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let entries = self.storage.list()?;
-        todo!()
+        for entry in entries {
+            self.index.index(entry.0, &entry.1)?;
+        }
+        Ok(())
     }
 }
