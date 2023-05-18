@@ -18,14 +18,14 @@ enum ProcessDataResult {
 pub(crate) struct Server {
     dashboard_content: String,
     connection_counter: Arc<AtomicU64>,
-    log_storage: log_storage::LogStorage,
+    log_storage: Arc<log_storage::LogStorage>,
 }
 
 impl Server {
     pub(crate) fn new(
         dashboard_content: String,
         connection_counter: Arc<AtomicU64>,
-        log_storage: log_storage::LogStorage,
+        log_storage: Arc<log_storage::LogStorage>,
     ) -> Self {
         Server {
             dashboard_content,
@@ -73,6 +73,7 @@ impl Server {
                 shutdown_rx.clone(),
                 self.dashboard_content.clone(),
                 self.connection_counter.clone(),
+                self.log_storage.clone(),
             );
             tokio::spawn(async move {
                 trace!("spawn thread for {} client", socket_addr);
@@ -93,8 +94,9 @@ struct Connection {
     socket: TcpStream,
     socket_addr: SocketAddr,
     shutdown_rx: watch::Receiver<()>,
-    dashboard_content: String,
+    dashboard_content: String, // todo: do not store as string because of coping?
     connection_counter: Arc<AtomicU64>,
+    log_storage: Arc<log_storage::LogStorage>,
 }
 
 impl Connection {
@@ -104,6 +106,7 @@ impl Connection {
         shutdown_rx: watch::Receiver<()>,
         dashboard_content: String,
         connection_counter: Arc<AtomicU64>,
+        log_storage: Arc<log_storage::LogStorage>,
     ) -> Self {
         Connection {
             socket,
@@ -111,6 +114,7 @@ impl Connection {
             shutdown_rx,
             dashboard_content,
             connection_counter,
+            log_storage,
         }
     }
 

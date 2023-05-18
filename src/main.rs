@@ -40,7 +40,7 @@ async fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
     let subscriber = tracing_subscriber::registry().with(filter).with(terminal_subscriber);
     tracing::subscriber::set_global_default(subscriber).expect("failed to set global subscriber");
 
-    let log_storage = log_storage::LogStorage::new(&cfg.index_name, &cfg.storage_name)?;
+    let log_storage = Arc::new(log_storage::LogStorage::new(&cfg.index_name, &cfg.storage_name)?);
 
     let connection_counter = Arc::new(AtomicU64::new(0));
     let server =
@@ -53,6 +53,7 @@ async fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
             Ok(()) => debug!("server has been stopped successfully"),
             Err(e) => error!("failed to start server : {}", e),
         }
+        // todo: fix it
         ECode::FailedToStartDaemon
     });
 

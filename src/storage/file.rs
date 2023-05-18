@@ -1,4 +1,4 @@
-use crate::storage::_Storage;
+use crate::{log_storage::Key, storage::_Storage};
 
 use super::error::Error;
 
@@ -11,11 +11,15 @@ impl File {
 }
 
 impl _Storage for File {
-    fn write(&mut self, key: &str, data: &[u8]) -> Result<(), Error> {
+    fn write(&mut self, _key: Key, _data: &[u8]) -> Result<(), Error> {
         todo!()
     }
 
-    fn read(&self, key: &str) -> Result<&[u8], Error> {
+    fn read(&self, _key: Key) -> Result<Vec<u8>, Error> {
+        todo!()
+    }
+
+    fn list(&self) -> Result<Vec<u8>, Error> {
         todo!()
     }
 }

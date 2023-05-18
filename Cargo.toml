@@ -7,14 +7,10 @@ edition = "2021"
 tokio = { version = "1.28.1", features = ["net", "io-util", "macros", "rt-multi-thread", "signal", "sync", "time"], default-features = false }
 tracing = { version = "0.1.37", features = [], default-features = false }
 tracing-subscriber = { version = "0.3.17", features = ["fmt", "env-filter", "ansi"], default-features = false }
-fastrand = { version = "1.9.0", features = [], default-features = false }
-sled = { version = "0.34.7", features = [], default-features = false }
-byteorder = { version = "1.4.3", features = [], default-features = false }
-zerocopy = { version = "0.6.1", features = [], default-features = false }
-serde = { version = "1.0.163", features = [], default-features = false }
-serde_json = { version = "1.0.96", features = [], default-features = false }
-tantivy = { version = "0.19.2", features = [], default-features = false }
+serde = { version = "1.0.163", features = ["std", "derive"], default-features = false }
+serde_json = { version = "1.0.96", features = ["std"], default-features = false }
 thiserror = { version = "1.0.40", features = [], default-features = false }
+fastrand = { version = "1.9.0", features = [], default-features = false }
 
 [features]
 default = ["index_nonsense", "index_tantivy", "storage_in_memory", "storage_file"]

@@ -1,5 +1,7 @@
 use crate::{index, storage};
 
+pub(crate) type Key = u64;
+
 pub(crate) struct LogStorage {
     index: index::Index,
     storage: storage::Storage,
@@ -17,11 +19,19 @@ impl LogStorage {
         Ok(log_storage)
     }
 
-    pub(crate) fn store(&self) -> Result<(), Box<dyn std::error::Error>> {
-        todo!()
+    // todo: is this async move work?
+    pub(crate) async fn store(&mut self, data: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+        async move {
+            let key: Key = fastrand::u64(..);
+            self.storage.write(key, data)?;
+            self.index.index(key, data)?;
+            Ok(())
+        }
+        .await
     }
 
     fn restore(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let entries = self.storage.list()?;
         todo!()
     }
 }
