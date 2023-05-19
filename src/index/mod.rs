@@ -1,8 +1,10 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use tracing::info;
 
 use crate::index::nonsense::Nonsense;
 use crate::index::tantivy::Tantivy;
-use crate::log_storage::Key;
+use crate::log_storage::{Key, Skip};
 
 use error::Error;
 use index_type::IndexType;
@@ -18,7 +20,7 @@ pub(crate) type Index = Box<dyn _Index + Send + Sync>;
 
 pub(crate) trait _Index {
     fn index(&mut self, key: Key, data: &[u8]) -> Result<(), Error>;
-    fn find(&self, query: &str) -> Result<FindResult, Error>;
+    fn find(&self, query: &str, skip: Skip) -> Result<FindResult, Error>;
 }
 
 pub(super) fn new_index(index_name: &str) -> Result<Index, Error> {
@@ -59,6 +61,7 @@ mod tests {
             );
         }
         test_nested_objects(&index);
+        test_skip(&index);
     }
 
     fn fill_index(index: &mut Index) {
@@ -70,7 +73,7 @@ mod tests {
 
     fn test_index(index: &Index) {
         {
-            let find_res = index.find("level:debug");
+            let find_res = index.find("level:debug", 0);
             assert!(find_res.is_ok());
             let entries = find_res.unwrap();
             assert_eq!(2, entries.len());
@@ -78,30 +81,47 @@ mod tests {
             assert_eq!(4, entries[1]);
         }
         {
-            let find_res = index.find("level:info");
+            let find_res = index.find("level:info", 0);
             assert!(find_res.is_ok());
             let entries = find_res.unwrap();
             assert_eq!(1, entries.len());
             assert_eq!(2, entries[0]);
         }
         {
-            let find_res = index.find("level:error");
+            let find_res = index.find("level:error", 0);
             assert!(find_res.is_ok());
             let entries = find_res.unwrap();
             assert_eq!(1, entries.len());
             assert_eq!(3, entries[0]);
         }
         {
-            let find_res = index.find("level:unknown");
+            let find_res = index.find("level:unknown", 0);
             assert!(find_res.is_err());
         }
     }
 
     fn test_nested_objects(index: &Index) {
-        let find_res = index.find("vars.id:1");
+        let find_res = index.find("vars.id:1", 0);
         assert!(find_res.is_ok());
         let entries = find_res.unwrap();
         assert_eq!(1, entries.len());
         assert_eq!(1, entries[0]);
+    }
+
+    fn test_skip(index: &Index) {
+        let entries = index.find("level:debug", 0).unwrap();
+        assert_eq!(2, entries.len());
+        let entries = index.find("level:debug", now_as_nanos_u64().unwrap()).unwrap();
+        assert_eq!(0, entries.len());
+    }
+
+    fn now_as_nanos_u64() -> Result<u64, Error> {
+        let now_as_nanos_u128 = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|e| Error::Internal(e.to_string()))?
+            .as_nanos();
+        let now_as_nanos_u64 =
+            u64::try_from(now_as_nanos_u128).map_err(|e| Error::Internal(e.to_string()))?;
+        Ok(now_as_nanos_u64)
     }
 }

@@ -258,6 +258,8 @@ Cache-Control: no-cache";
 
     async fn send_sse_data(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         loop {
+            // todo: need paging by time or by counter
+            let fresh_logs = self.log_storage.lock().await.find("", 0).await?;
             match self.socket.write_all(b"data\n\n").await {
                 Ok(()) => Ok(()),
                 Err(e) => match e.kind() {

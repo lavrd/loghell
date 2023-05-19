@@ -1,6 +1,6 @@
 use crate::{
     index::{FindResult, _Index},
-    log_storage::Key,
+    log_storage::{Key, Skip},
 };
 
 use super::error::Error;
@@ -18,7 +18,7 @@ impl _Index for Tantivy {
         todo!()
     }
 
-    fn find(&self, _query: &str) -> Result<FindResult, Error> {
+    fn find(&self, _query: &str, _skip: Skip) -> Result<FindResult, Error> {
         todo!()
     }
 }

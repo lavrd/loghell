@@ -1,6 +1,7 @@
 use crate::{index, storage};
 
 pub(crate) type Key = u64;
+pub(crate) type Skip = u64;
 
 pub(crate) struct LogStorage {
     index: index::Index,
@@ -26,6 +27,23 @@ impl LogStorage {
             self.storage.write(key, data)?;
             self.index.index(key, data)?;
             Ok(())
+        }
+        .await
+    }
+
+    pub(crate) async fn find(
+        &self,
+        query: &str,
+        skip: Skip,
+    ) -> Result<Vec<Vec<u8>>, Box<dyn std::error::Error>> {
+        async move {
+            let mut values: Vec<Vec<u8>> = Vec::new();
+            let keys = self.index.find(query, skip)?;
+            for key in keys {
+                let data = self.storage.read(key)?;
+                values.push(data);
+            }
+            Ok(values)
         }
         .await
     }
