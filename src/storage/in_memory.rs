@@ -5,7 +5,6 @@ use crate::{log_storage::Key, storage::_Storage};
 use super::error::Error;
 
 pub(super) struct InMemory {
-    // todo: store &[u8] instead of vector
     values: HashMap<Key, Vec<u8>>,
 }
 

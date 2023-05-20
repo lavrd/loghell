@@ -4,10 +4,8 @@ version = "2.0.0"
 edition = "2021"
 
 [dependencies]
-# todo: check that we need everything
 tokio = { version = "1.28.1", features = ["net", "io-util", "macros", "rt-multi-thread", "signal", "sync", "time"], default-features = false }
 tracing = { version = "0.1.37", features = [], default-features = false }
-# todo: check that we need everything
 tracing-subscriber = { version = "0.3.17", features = ["fmt", "env-filter", "ansi"], default-features = false }
 serde = { version = "1.0.163", features = ["std", "derive"], default-features = false }
 serde_json = { version = "1.0.96", features = ["std"], default-features = false }

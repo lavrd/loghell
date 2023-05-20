@@ -14,10 +14,7 @@ pub(crate) type Storage = Box<dyn _Storage + Send + Sync>;
 
 pub(crate) trait _Storage {
     fn write(&mut self, key: Key, data: &[u8]) -> Result<(), Error>;
-    // todo: return &[u8], not vector
     fn read(&self, key: Key) -> Result<Vec<u8>, Error>;
-    // todo: add paging
-    // todo: return &[u8], not vector
     fn list(&self) -> Result<Vec<(Key, Vec<u8>)>, Error>;
 }
 

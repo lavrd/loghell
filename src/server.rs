@@ -97,7 +97,7 @@ struct Connection {
     socket: TcpStream,
     socket_addr: SocketAddr,
     shutdown_rx: watch::Receiver<()>,
-    dashboard_content: String, // todo: do not store as string because of coping?
+    dashboard_content: String, 
     connection_counter: Arc<AtomicU64>,
     log_storage: LogStoragePointer,
 }

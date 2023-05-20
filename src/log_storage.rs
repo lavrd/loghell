@@ -20,7 +20,6 @@ impl LogStorage {
         Ok(log_storage)
     }
 
-    // todo: is this async move work?
     pub(crate) async fn store(&mut self, data: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
         async move {
             let key: Key = fastrand::u64(..);
