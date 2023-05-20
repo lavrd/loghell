@@ -2,7 +2,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use clap::{Args, Parser, Subcommand};
 use hyper::{Body, Client, Method, Request, StatusCode};
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
 
 #[derive(Debug, Parser)]
@@ -28,6 +28,8 @@ enum Commands {
     Health,
     /// Simulate sending logs to Loghell
     Simulate,
+    /// Subscribe for new logs
+    Subscribe,
 }
 
 #[tokio::main]
@@ -47,6 +49,7 @@ async fn do_main() -> Result<(), Box<dyn std::error::Error>> {
     match cli.command {
         Commands::Health => health(&endpoint).await?,
         Commands::Simulate => simulation(&endpoint).await?,
+        Commands::Subscribe => subscribe(&endpoint).await?,
     }
     Ok(())
 }
@@ -71,12 +74,27 @@ async fn simulation(endpoint: &str) -> Result<(), Box<dyn std::error::Error>> {
         data.push_str(&now_as_nanos_u64()?.to_string());
         data.push_str(r#"","message":"example debug log"}"#);
         stream.write_all(data.as_bytes()).await?;
-        tokio::time::sleep(Duration::from_millis(250)).await;
+        tokio::time::sleep(Duration::from_millis(1000)).await;
     }
     Ok(())
 }
 
-pub(crate) fn now_as_nanos_u64() -> Result<u64, Box<dyn std::error::Error>> {
+async fn subscribe(endpoint: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let mut stream = TcpStream::connect(endpoint).await?;
+    stream.write_all(b"GET /events HTTP/1.1").await?;
+    let mut reader = BufReader::new(stream);
+    loop {
+        let mut buf: String = String::new();
+        reader.read_line(&mut buf).await?;
+        if buf.is_empty() {
+            break;
+        }
+        eprintln!("{:?}", buf);
+    }
+    Ok(())
+}
+
+fn now_as_nanos_u64() -> Result<u64, Box<dyn std::error::Error>> {
     let now_as_nanos_u128 = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
     let now_as_nanos_u64 = u64::try_from(now_as_nanos_u128)?;
     Ok(now_as_nanos_u64)

@@ -266,10 +266,13 @@ Cache-Control: no-cache";
     async fn send_sse_data(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let mut start_from = 0;
         loop {
-            let logs = self.log_storage.lock().await.find("", start_from).await?;
+            let mut logs = self.log_storage.lock().await.find("level:debug", start_from).await?;
             start_from = now_as_nanos_u64()?;
-            for _log in logs {
-                match self.socket.write_all(b"data\n\n").await {
+            // We need to send at leat one message at time to check that connection is still open.
+            logs.push(b"check".to_vec());
+            for mut log in logs {
+                log.push(10); // add new line
+                match self.socket.write_all(&log).await {
                     Ok(()) => Ok(()),
                     Err(e) => match e.kind() {
                         std::io::ErrorKind::BrokenPipe => {

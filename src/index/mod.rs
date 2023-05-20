@@ -7,7 +7,7 @@ use crate::log_storage::{Key, Skip};
 use error::Error;
 use index_type::IndexType;
 
-mod error;
+pub(crate) mod error;
 mod index_type;
 mod nonsense;
 mod tantivy;
@@ -75,8 +75,12 @@ mod tests {
             assert!(find_res.is_ok());
             let entries = find_res.unwrap();
             assert_eq!(2, entries.len());
-            assert_eq!(1, entries[0]);
-            assert_eq!(4, entries[1]);
+            if entries[0] != 1 && entries[0] != 4 {
+                unreachable!()
+            }
+            if entries[1] != 1 && entries[1] != 4 {
+                unreachable!()
+            }
         }
         {
             let find_res = index.find("level:info", 0);

@@ -37,7 +37,13 @@ impl LogStorage {
     ) -> Result<Vec<Vec<u8>>, Box<dyn std::error::Error>> {
         async move {
             let mut values: Vec<Vec<u8>> = Vec::new();
-            let keys = self.index.find(query, skip)?;
+            let keys = match self.index.find(query, skip) {
+                Ok(keys) => keys,
+                Err(e) => match e {
+                    crate::index::error::Error::NotFound => return Ok(values),
+                    _ => return Err(e.to_string().into()),
+                },
+            };
             for key in keys {
                 let data = self.storage.read(key)?;
                 values.push(data);
