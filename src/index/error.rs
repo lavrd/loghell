@@ -11,5 +11,5 @@ pub(crate) enum Error {
     #[error("data not found")]
     NotFound,
     #[error("internal error: {0}")]
-    Internal(String)
+    Internal(String),
 }

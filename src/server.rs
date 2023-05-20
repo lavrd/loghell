@@ -97,7 +97,7 @@ struct Connection {
     socket: TcpStream,
     socket_addr: SocketAddr,
     shutdown_rx: watch::Receiver<()>,
-    dashboard_content: String, 
+    dashboard_content: String,
     connection_counter: Arc<AtomicU64>,
     log_storage: LogStoragePointer,
 }
@@ -205,6 +205,13 @@ impl Connection {
                 }
                 if buf.starts_with(b"GET /events HTTP/1.1") {
                     return self.handle_sse().await.map(|_| Ok(ProcessDataResult::Close))?;
+                }
+                if buf.starts_with(b"GET /health HTTP/1.1") {
+                    let response = "HTTP/1.1 200 OK
+Connection: close\n\n";
+                    self.socket.write_all(response.as_bytes()).await?;
+                    self.socket.flush().await?;
+                    return Ok(ProcessDataResult::Close);
                 }
                 self.handle_log(buf, n).await.map(|_| Ok(ProcessDataResult::Ok))?
             }
