@@ -1,5 +1,9 @@
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
 use clap::{Args, Parser, Subcommand};
 use hyper::{Body, Client, Method, Request, StatusCode};
+use tokio::io::AsyncWriteExt;
+use tokio::net::TcpStream;
 
 #[derive(Debug, Parser)]
 #[clap(name = "loghellctl")]
@@ -22,6 +26,8 @@ struct GlobalArgs {
 enum Commands {
     /// Check Loghell health status
     Health,
+    /// Simulate sending logs to Loghell
+    Simulate,
 }
 
 #[tokio::main]
@@ -40,6 +46,7 @@ async fn do_main() -> Result<(), Box<dyn std::error::Error>> {
     let endpoint = cli.args.endpoint;
     match cli.command {
         Commands::Health => health(&endpoint).await?,
+        Commands::Simulate => simulation(&endpoint).await?,
     }
     Ok(())
 }
@@ -53,4 +60,24 @@ async fn health(endpoint: &str) -> Result<(), Box<dyn std::error::Error>> {
         return Err(format!("incorrect response status code: {}", res.status().as_u16()).into());
     }
     Ok(())
+}
+
+async fn simulation(endpoint: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let mut stream = TcpStream::connect(endpoint).await?;
+    for _ in 0..100 {
+        // {"level":"debug","component":"example","time":"1684607842880484000","message":"example debug log"}
+        let mut data = String::new();
+        data.push_str(r#"{"level":"debug","component":"example","time":""#);
+        data.push_str(&now_as_nanos_u64()?.to_string());
+        data.push_str(r#"","message":"example debug log"}"#);
+        stream.write_all(data.as_bytes()).await?;
+        tokio::time::sleep(Duration::from_millis(250)).await;
+    }
+    Ok(())
+}
+
+pub(crate) fn now_as_nanos_u64() -> Result<u64, Box<dyn std::error::Error>> {
+    let now_as_nanos_u128 = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+    let now_as_nanos_u64 = u64::try_from(now_as_nanos_u128)?;
+    Ok(now_as_nanos_u64)
 }

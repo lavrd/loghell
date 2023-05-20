@@ -207,11 +207,7 @@ impl Connection {
                     return self.handle_sse().await.map(|_| Ok(ProcessDataResult::Close))?;
                 }
                 if buf.starts_with(b"GET /health HTTP/1.1") {
-                    let response = "HTTP/1.1 200 OK
-Connection: close\n\n";
-                    self.socket.write_all(response.as_bytes()).await?;
-                    self.socket.flush().await?;
-                    return Ok(ProcessDataResult::Close);
+                    return self.handle_health().await.map(|_| Ok(ProcessDataResult::Close))?;
                 }
                 self.handle_log(buf, n).await.map(|_| Ok(ProcessDataResult::Ok))?
             }
@@ -231,13 +227,16 @@ Connection: close\n\n";
     }
 
     async fn handle_log(&self, buf: &[u8], n: usize) -> Result<(), Box<dyn std::error::Error>> {
-        // We use n-2 to remove /r/n at the end of data.
-        let truncated_buf: &[u8] = &buf[0..n - 2];
-
-        // Convert bytes to string.
-        let data = from_utf8(truncated_buf)?;
-        info!("new data received from {} client : {:?}", self.socket_addr, data);
-
+        let mut truncated_buf = &buf[0..n];
+        // Remove \n at the end of the data.
+        if truncated_buf.ends_with(&[10]) {
+            truncated_buf = &truncated_buf[0..n - 1]
+        }
+        info!(
+            "new data received from {} client : {:?}",
+            self.socket_addr,
+            from_utf8(truncated_buf)?
+        );
         self.log_storage.lock().await.store(truncated_buf).await
     }
 
@@ -288,6 +287,14 @@ Cache-Control: no-cache";
             trace!("sent sse (logs) data to {} client", self.socket_addr);
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         }
+    }
+
+    async fn handle_health(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        let response = "HTTP/1.1 200 OK
+Connection: close\n\n";
+        self.socket.write_all(response.as_bytes()).await?;
+        self.socket.flush().await?;
+        Ok(())
     }
 }
 

@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	endpoint := flag.String("e", "127.0.0.1:8080", "set loghell server endpoint")
+	endpoint := flag.String("e", "127.0.0.1:6669", "set loghell server endpoint")
 	flag.Parse()
 
 	w, err := writer.NewZerolog(*endpoint)
