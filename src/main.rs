@@ -12,9 +12,11 @@ mod config;
 mod index;
 mod log_storage;
 mod server;
+mod shared;
 mod storage;
 
 #[repr(u8)]
+#[derive(PartialEq, Eq)]
 enum ExitCode {
     Ok = 0,
     FailedToStartDaemon = 201,
@@ -77,10 +79,5 @@ async fn main() -> Result<std::process::ExitCode, Box<dyn std::error::Error>> {
             debug!("server successfully stopped");
         }
     }
-
-    // todo: check that it is work
-    let start_exit_code: std::process::ExitCode = res.await?.into();
-    eprintln!("{:?}", start_exit_code);
-
-    Ok(ExitCode::Ok.into())
+    Ok(res.await?.into())
 }

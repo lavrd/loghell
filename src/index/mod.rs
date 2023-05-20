@@ -1,5 +1,3 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use tracing::info;
 
 use crate::index::nonsense::Nonsense;
@@ -36,7 +34,7 @@ pub(super) fn new_index(index_name: &str) -> Result<Index, Error> {
 
 #[cfg(test)]
 mod tests {
-    use crate::index::*;
+    use crate::{index::*, shared};
 
     const LOG1: &str = r#"{"level":"debug","message":"test-1","vars":{"id":1}}"#;
     const LOG2: &str = r#"{"level":"info","message":"test-2","vars":{"id":2}}"#;
@@ -111,17 +109,7 @@ mod tests {
     fn test_skip(index: &Index) {
         let entries = index.find("level:debug", 0).unwrap();
         assert_eq!(2, entries.len());
-        let entries = index.find("level:debug", now_as_nanos_u64().unwrap()).unwrap();
+        let entries = index.find("level:debug", shared::now_as_nanos_u64().unwrap()).unwrap();
         assert_eq!(0, entries.len());
-    }
-
-    fn now_as_nanos_u64() -> Result<u64, Error> {
-        let now_as_nanos_u128 = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(|e| Error::Internal(e.to_string()))?
-            .as_nanos();
-        let now_as_nanos_u64 =
-            u64::try_from(now_as_nanos_u128).map_err(|e| Error::Internal(e.to_string()))?;
-        Ok(now_as_nanos_u64)
     }
 }

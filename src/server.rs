@@ -9,6 +9,7 @@ use tokio::sync::{watch, Mutex};
 use tracing::{debug, error, info, trace};
 
 use crate::log_storage;
+use crate::shared::now_as_nanos_u64;
 
 enum ProcessDataResult {
     Ok,
@@ -257,24 +258,27 @@ Cache-Control: no-cache";
     }
 
     async fn send_sse_data(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        let mut start_from = 0;
         loop {
-            // todo: need paging by time or by counter
-            let fresh_logs = self.log_storage.lock().await.find("", 0).await?;
-            match self.socket.write_all(b"data\n\n").await {
-                Ok(()) => Ok(()),
-                Err(e) => match e.kind() {
-                    std::io::ErrorKind::BrokenPipe => {
-                        debug!(
-                            "cannot send sse data; looks like {} client has disconnected",
-                            self.socket_addr
-                        );
-                        return Ok(());
-                    }
-                    _ => Err(e),
-                },
-            }?;
+            let logs = self.log_storage.lock().await.find("", start_from).await?;
+            start_from = now_as_nanos_u64()?;
+            for _log in logs {
+                match self.socket.write_all(b"data\n\n").await {
+                    Ok(()) => Ok(()),
+                    Err(e) => match e.kind() {
+                        std::io::ErrorKind::BrokenPipe => {
+                            debug!(
+                                "cannot send sse data; looks like {} client has disconnected",
+                                self.socket_addr
+                            );
+                            return Ok(());
+                        }
+                        _ => Err(e),
+                    },
+                }?;
+            }
             self.socket.flush().await?;
-            trace!("sent sse data to {} client", self.socket_addr);
+            trace!("sent sse (logs) data to {} client", self.socket_addr);
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         }
     }

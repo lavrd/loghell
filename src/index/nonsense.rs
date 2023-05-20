@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::index::{FindResult, _Index};
 use crate::log_storage::{Key, Skip};
+use crate::shared;
 
 use super::error::Error;
 
@@ -12,16 +12,16 @@ struct Data {
     created_at: u64,
 }
 
+type Values = HashMap<String, HashMap<String, HashSet<Data>>>; // field_name : { field_value : (key, created_at) }
+
 pub(super) struct Nonsense {
-    // entries: HashMap<u64, Data>,
-    index: HashMap<String, HashMap<String, HashSet<Data>>>, // field_name : { field_value : (key, created_at) }
+    values: Values,
 }
 
 impl Nonsense {
     pub(super) fn new() -> Self {
         Nonsense {
-            // entries: HashMap::new(),
-            index: HashMap::new(),
+            values: HashMap::new(),
         }
     }
 }
@@ -35,40 +35,16 @@ impl _Index for Nonsense {
                 "nonsense storage can't work without objects".to_string(),
             ));
         }
-        let obj = data_as_value
-            .as_object()
-            .ok_or(Error::DecodeData("failed to get data as object".to_string()))?;
-
+        let obj = cast_value_as_object(&data_as_value)?;
         for (name, value) in obj.iter() {
             if value.is_object() {
-                // todo: we do cast to object twice, so move it
-                // todo: same for index logic
-                // todo: write in readme that we supports only one nesting with nonsense storage
-                for (nested_name, nested_value) in value
-                    .as_object()
-                    .ok_or(Error::DecodeData("failed to get data as object".to_string()))?
-                {
+                for (nested_name, nested_value) in cast_value_as_object(value)? {
                     let name = format!("{name}.{nested_name}");
-                    let ids_by_values =
-                        self.index.entry(name.to_string()).or_insert_with(HashMap::new);
-
-                    let value = nested_value.to_string().replace('\"', "");
-                    let ids = ids_by_values.entry(value.to_string()).or_insert_with(HashSet::new);
-                    ids.insert(Data {
-                        key,
-                        created_at: now_as_nanos_u64()?,
-                    });
+                    do_index(&mut self.values, name, nested_value, key)?;
                 }
                 continue;
             }
-
-            let ids_by_values = self.index.entry(name.to_string()).or_insert_with(HashMap::new);
-            let value = value.to_string().replace('\"', "");
-            let ids = ids_by_values.entry(value.to_string()).or_insert_with(HashSet::new);
-            ids.insert(Data {
-                key,
-                created_at: now_as_nanos_u64()?,
-            });
+            do_index(&mut self.values, name.clone(), value, key)?;
         }
         Ok(())
     }
@@ -81,7 +57,7 @@ impl _Index for Nonsense {
         let key: &str = split[0];
         let value: &str = split[1];
         let entries =
-            self.index.get(key).ok_or(Error::NotFound)?.get(value).ok_or(Error::NotFound)?;
+            self.values.get(key).ok_or(Error::NotFound)?.get(value).ok_or(Error::NotFound)?;
         let mut res: FindResult = FindResult::new();
         for entry in entries {
             if entry.created_at < skip {
@@ -93,12 +69,24 @@ impl _Index for Nonsense {
     }
 }
 
-fn now_as_nanos_u64() -> Result<u64, Error> {
-    let now_as_nanos_u128 = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|e| Error::Internal(e.to_string()))?
-        .as_nanos();
-    let now_as_nanos_u64 =
-        u64::try_from(now_as_nanos_u128).map_err(|e| Error::Internal(e.to_string()))?;
-    Ok(now_as_nanos_u64)
+fn do_index(
+    values: &mut Values,
+    field_name: String,
+    value: &serde_json::Value,
+    key: Key,
+) -> Result<(), Error> {
+    let ids_by_values = values.entry(field_name).or_insert_with(HashMap::new);
+    let value = value.to_string().replace('\"', "");
+    let ids = ids_by_values.entry(value).or_insert_with(HashSet::new);
+    ids.insert(Data {
+        key,
+        created_at: shared::now_as_nanos_u64().map_err(|e| Error::Internal(e.to_string()))?,
+    });
+    Ok(())
+}
+
+fn cast_value_as_object(
+    val: &serde_json::Value,
+) -> Result<&serde_json::Map<String, serde_json::Value>, Error> {
+    val.as_object().ok_or(Error::DecodeData("failed to get data as object".to_string()))
 }
