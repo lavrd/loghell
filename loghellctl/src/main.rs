@@ -89,7 +89,13 @@ async fn subscribe(endpoint: &str) -> Result<(), Box<dyn std::error::Error>> {
         if buf.is_empty() {
             break;
         }
-        eprintln!("{:?}", buf);
+        // Delete new line.
+        buf.pop();
+        // It means json log.
+        // We need to skip other messages to not show SSE HTTP responsa and check messages.
+        if buf.starts_with('{') {
+            eprintln!("{}", buf);
+        }
     }
     Ok(())
 }
