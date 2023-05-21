@@ -9,7 +9,7 @@ ignore = []
 
 [licenses]
 unlicensed = "deny"
-allow = ["Apache-2.0", "MIT", "ISC"]
+allow = ["Apache-2.0", "MIT", "ISC", "BSD-3-Clause", "Unicode-DFS-2016"]
 copyleft = "deny"
 allow-osi-fsf-free = "neither"
 default = "deny"
