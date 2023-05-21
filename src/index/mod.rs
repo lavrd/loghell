@@ -1,5 +1,6 @@
 use tracing::info;
 
+#[cfg(feature = "index_nonsense")]
 use crate::index::nonsense::Nonsense;
 use crate::index::tantivy::Tantivy;
 use crate::log_storage::{Key, Skip};
@@ -9,6 +10,7 @@ use index_type::IndexType;
 
 pub(crate) mod error;
 mod index_type;
+#[cfg(feature = "index_nonsense")]
 mod nonsense;
 mod tantivy;
 
@@ -24,6 +26,7 @@ pub(crate) trait _Index {
 pub(super) fn new_index(index_name: &str) -> Result<Index, Error> {
     let index_type = index_name.into();
     let index: Index = match index_type {
+        #[cfg(feature = "index_nonsense")]
         IndexType::Nonsense => Box::new(Nonsense::new()),
         IndexType::Tantivy => Box::new(Tantivy::new()?),
         IndexType::Unknown => return Err(Error::UnknownIndexType(index_name.to_string())),

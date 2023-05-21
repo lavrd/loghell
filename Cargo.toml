@@ -14,11 +14,8 @@ thiserror = { version = "1.0.40", features = [], default-features = false }
 fastrand = { version = "1.9.0", features = [], default-features = false }
 
 [features]
-default = ["index_nonsense", "index_tantivy", "storage_in_memory", "storage_file"]
+default = ["index_nonsense"]
 index_nonsense = []
-index_tantivy = []
-storage_in_memory = []
-storage_file = []
 
 [workspace]
 members = [".", "loghellctl"]
