@@ -8,6 +8,7 @@ use tracing_subscriber::filter::{LevelFilter, Targets};
 use tracing_subscriber::fmt;
 use tracing_subscriber::layer::SubscriberExt;
 
+mod cluster;
 mod config;
 mod index;
 mod log_storage;
@@ -44,14 +45,24 @@ async fn main() -> Result<std::process::ExitCode, Box<dyn std::error::Error>> {
     let log_storage =
         Arc::new(Mutex::new(log_storage::LogStorage::new(&cfg.index_name, &cfg.storage_name)?));
 
+    // csr - cluster state reader.
+    let (cluster, csr) = cluster::Cluster::new(cfg.cluster_addrs);
+
     let connection_counter = Arc::new(AtomicU64::new(0));
-    let server =
-        server::Server::new(dashboard_content.to_string(), connection_counter.clone(), log_storage);
+    let server = server::Server::new(
+        dashboard_content.to_string(),
+        connection_counter.clone(),
+        log_storage,
+        csr,
+    );
     let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(());
 
+    let mut handlers: Vec<JoinHandle<ExitCode>> = vec![];
+
     let socket_addr = cfg.socket_addr;
+    let shutdown_rx_ = shutdown_rx.clone();
     let res: JoinHandle<ExitCode> = tokio::spawn(async move {
-        match server.start(&socket_addr, shutdown_rx).await {
+        match server.start(&socket_addr, shutdown_rx_).await {
             Ok(()) => {
                 debug!("server has been stopped successfully");
                 ExitCode::Ok
@@ -62,22 +73,35 @@ async fn main() -> Result<std::process::ExitCode, Box<dyn std::error::Error>> {
             }
         }
     });
+    handlers.push(res);
+
+    let res: JoinHandle<ExitCode> = tokio::spawn(async move {
+        cluster.start(shutdown_rx).await;
+        ExitCode::Ok
+    });
+    handlers.push(res);
 
     tokio::signal::ctrl_c().await?;
     info!("ctrl+c signal has been received");
 
     trace!("server open connections : {}", connection_counter.load(Ordering::Relaxed));
     shutdown_tx.send(())?;
-    let timeout = tokio::time::sleep(tokio::time::Duration::from_secs(1));
+    let timeout = tokio::time::sleep(tokio::time::Duration::from_secs(10));
     tokio::pin!(timeout);
     tokio::select! {
         _ = &mut timeout => {
             error!("server stopping is timed out");
             return Ok(ExitCode::FailedToStopDaemon.into())
         }
-        _ = shutdown_tx.closed() => {
-            debug!("server successfully stopped");
+        _ = shutdown_tx.closed() => debug!("server successfully stopped"),
+    }
+
+    let mut exit_code = ExitCode::Ok;
+    for handler in handlers {
+        let ec: ExitCode = handler.await?;
+        if ec != ExitCode::Ok {
+            exit_code = ec
         }
     }
-    Ok(res.await?.into())
+    Ok(exit_code.into())
 }

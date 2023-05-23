@@ -8,8 +8,8 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{watch, Mutex};
 use tracing::{debug, error, info, trace};
 
-use crate::log_storage;
 use crate::shared::now_as_nanos_u64;
+use crate::{cluster, log_storage};
 
 enum ProcessDataResult {
     Ok,
@@ -22,6 +22,7 @@ pub(crate) struct Server {
     dashboard_content: String,
     connection_counter: Arc<AtomicU64>,
     log_storage: LogStoragePointer,
+    csr: cluster::ClusterStateReader,
 }
 
 impl Server {
@@ -29,11 +30,13 @@ impl Server {
         dashboard_content: String,
         connection_counter: Arc<AtomicU64>,
         log_storage: LogStoragePointer,
+        csr: cluster::ClusterStateReader,
     ) -> Self {
         Server {
             dashboard_content,
             connection_counter,
             log_storage,
+            csr,
         }
     }
 
@@ -77,6 +80,7 @@ impl Server {
                 self.dashboard_content.clone(),
                 self.connection_counter.clone(),
                 self.log_storage.clone(),
+                self.csr.clone(),
             );
             tokio::spawn(async move {
                 trace!("spawn thread for {} client", socket_addr);
@@ -100,6 +104,7 @@ struct Connection {
     dashboard_content: String,
     connection_counter: Arc<AtomicU64>,
     log_storage: LogStoragePointer,
+    csr: cluster::ClusterStateReader,
 }
 
 impl Connection {
@@ -110,6 +115,7 @@ impl Connection {
         dashboard_content: String,
         connection_counter: Arc<AtomicU64>,
         log_storage: LogStoragePointer,
+        csr: cluster::ClusterStateReader,
     ) -> Self {
         Connection {
             socket,
@@ -118,6 +124,7 @@ impl Connection {
             dashboard_content,
             connection_counter,
             log_storage,
+            csr,
         }
     }
 
@@ -209,6 +216,9 @@ impl Connection {
                 if buf.starts_with(b"GET /health HTTP/1.1") {
                     return self.handle_health().await.map(|_| Ok(ProcessDataResult::Close))?;
                 }
+                if buf.starts_with(b"cluster>") {
+                    return self.handle_cluster().await.map(|_| Ok(ProcessDataResult::Close))?;
+                }
                 self.handle_log(buf, n).await.map(|_| Ok(ProcessDataResult::Ok))?
             }
         }
@@ -288,6 +298,7 @@ Cache-Control: no-cache";
             }
             self.socket.flush().await?;
             trace!("sent sse (logs) data to {} client", self.socket_addr);
+            // todo: sleep 1s only if there are no logs
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         }
     }
@@ -297,6 +308,16 @@ Cache-Control: no-cache";
 Connection: close\n\n";
         self.socket.write_all(response.as_bytes()).await?;
         self.socket.flush().await?;
+        Ok(())
+    }
+
+    async fn handle_cluster(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        tokio::select! {
+            _ = self.csr.changed() => {
+                let cluster_state = self.csr.borrow_and_update();
+                eprintln!("{:?}", cluster_state.asd);
+            }
+        }
         Ok(())
     }
 }
