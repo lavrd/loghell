@@ -46,7 +46,7 @@ async fn main() -> Result<std::process::ExitCode, Box<dyn std::error::Error>> {
         Arc::new(Mutex::new(log_storage::LogStorage::new(&cfg.index_name, &cfg.storage_name)?));
 
     // csr - cluster state reader.
-    let (cluster, csr) = cluster::Cluster::new(cfg.cluster_addrs);
+    let (cluster, csr) = cluster::Cluster::new();
 
     let connection_counter = Arc::new(AtomicU64::new(0));
     let server = server::Server::new(
@@ -68,7 +68,7 @@ async fn main() -> Result<std::process::ExitCode, Box<dyn std::error::Error>> {
                 ExitCode::Ok
             }
             Err(e) => {
-                error!("failed to start server : {}", e);
+                error!("failed to start server: {}", e);
                 ExitCode::FailedToStartDaemon
             }
         }
@@ -76,8 +76,16 @@ async fn main() -> Result<std::process::ExitCode, Box<dyn std::error::Error>> {
     handlers.push(res);
 
     let res: JoinHandle<ExitCode> = tokio::spawn(async move {
-        cluster.start(shutdown_rx).await;
-        ExitCode::Ok
+        match cluster.start(cfg.cluster_addrs, shutdown_rx).await {
+            Ok(()) => {
+                debug!("cluster has been stopped successfully");
+                ExitCode::Ok
+            }
+            Err(e) => {
+                error!("failed to start cluster: {}", e);
+                ExitCode::FailedToStartDaemon
+            }
+        }
     });
     handlers.push(res);
 

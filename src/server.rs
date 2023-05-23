@@ -51,7 +51,7 @@ impl Server {
             because we can pass local address with zero port which can be selected randomly.
         */
         let local_addr = listener.local_addr()?;
-        info!("socket starts at : {}", local_addr);
+        info!("socket starts at: {}", local_addr);
 
         let mut shutdown_rx_ = shutdown_rx.clone();
         tokio::select! {
@@ -312,13 +312,27 @@ Connection: close\n\n";
     }
 
     async fn handle_cluster(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        tokio::select! {
-            _ = self.csr.changed() => {
-                let cluster_state = self.csr.borrow_and_update();
-                eprintln!("{:?}", cluster_state.asd);
+        // todo: how to stop this loop?
+        // todo: how to use cluster state var from channel?
+        loop {
+            tokio::select! {
+                _ = self.csr.changed() => {}
             }
+            // todo: we already have such logic in this module, reuse it
+            match self.socket.write_all(b"asd").await {
+                Ok(()) => Ok(()),
+                Err(e) => match e.kind() {
+                    std::io::ErrorKind::BrokenPipe => {
+                        debug!(
+                            "cannot send sse data; looks like {} client has disconnected",
+                            self.socket_addr
+                        );
+                        return Ok(());
+                    }
+                    _ => Err(e),
+                },
+            }?;
         }
-        Ok(())
     }
 }
 
