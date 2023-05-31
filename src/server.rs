@@ -5,24 +5,24 @@ use std::sync::Arc;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::{watch, Mutex};
+use tokio::sync::watch;
 use tracing::{debug, error, info, trace};
 
+use crate::cluster::Message;
+use crate::cluster::{self, NEW_LOG_MESSAGE_TYPE};
+use crate::log_storage::LogStoragePointer;
 use crate::shared::now_as_nanos_u64;
-use crate::{cluster, log_storage};
 
 enum ProcessDataResult {
     Ok,
     Close,
 }
 
-type LogStoragePointer = Arc<Mutex<log_storage::LogStorage>>;
-
 pub(crate) struct Server {
     dashboard_content: String,
     connection_counter: Arc<AtomicU64>,
     log_storage: LogStoragePointer,
-    csr: cluster::ClusterStateTransmitter,
+    csr: cluster::Transmitter,
 }
 
 impl Server {
@@ -30,7 +30,7 @@ impl Server {
         dashboard_content: String,
         connection_counter: Arc<AtomicU64>,
         log_storage: LogStoragePointer,
-        csr: cluster::ClusterStateTransmitter,
+        csr: cluster::Transmitter,
     ) -> Self {
         Server {
             dashboard_content,
@@ -104,7 +104,7 @@ struct Connection {
     dashboard_content: String,
     connection_counter: Arc<AtomicU64>,
     log_storage: LogStoragePointer,
-    csr: cluster::ClusterStateReader,
+    csr: cluster::Reader,
 }
 
 impl Connection {
@@ -115,7 +115,7 @@ impl Connection {
         dashboard_content: String,
         connection_counter: Arc<AtomicU64>,
         log_storage: LogStoragePointer,
-        csr: cluster::ClusterStateReader,
+        csr: cluster::Reader,
     ) -> Self {
         Connection {
             socket,
@@ -305,9 +305,22 @@ Connection: close\n\n";
     }
 
     async fn handle_cluster(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        // As we want to add meta data to our message when transmit it to other cluster members
+        // we need to add two more bytes with it. It is message type and new line.
+        const DATA_OVERHEAD_LENGTH: usize = 2;
         loop {
-            let _data = self.csr.recv().await?;
-            let is_stop = write(&mut self.socket, &self.socket_addr, b"asd\n").await?;
+            let msg = self.csr.recv().await?;
+            let data = match msg {
+                Message::NewLog(new_log) => {
+                    let mut data: Vec<u8> =
+                        Vec::with_capacity(new_log.len() + DATA_OVERHEAD_LENGTH);
+                    data.insert(0, NEW_LOG_MESSAGE_TYPE); // add message type
+                    data.extend(new_log.iter());
+                    data.push(10); // add new line
+                    data
+                }
+            };
+            let is_stop = write(&mut self.socket, &self.socket_addr, &data).await?;
             if is_stop {
                 return Ok(());
             }

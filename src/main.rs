@@ -42,8 +42,8 @@ async fn main() -> Result<std::process::ExitCode, Box<dyn std::error::Error>> {
     let subscriber = tracing_subscriber::registry().with(filter).with(terminal_subscriber);
     tracing::subscriber::set_global_default(subscriber).expect("failed to set global subscriber");
 
-    let log_storage =
-        Arc::new(Mutex::new(log_storage::LogStorage::new(&cfg.index_name, &cfg.storage_name)?));
+    let (log_storage, lst) = log_storage::LogStorage::new(&cfg.index_name, &cfg.storage_name)?;
+    let log_storage = Arc::new(Mutex::new(log_storage));
 
     // csr - cluster state reader.
     let (cluster, csr) = cluster::Cluster::new();
@@ -76,7 +76,7 @@ async fn main() -> Result<std::process::ExitCode, Box<dyn std::error::Error>> {
     handlers.push(res);
 
     let res: JoinHandle<ExitCode> = tokio::spawn(async move {
-        match cluster.start(cfg.cluster_addrs, log_storage, shutdown_rx).await {
+        match cluster.start(cfg.cluster_addrs, log_storage, lst.subscribe(), shutdown_rx).await {
             Ok(()) => {
                 debug!("cluster has been stopped successfully");
                 ExitCode::Ok

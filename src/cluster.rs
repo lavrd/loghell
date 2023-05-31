@@ -1,31 +1,34 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
-use thiserror::Error;
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::TcpStream,
-    sync::Mutex,
 };
-use tracing::{debug, error, trace};
+use tracing::{debug, error};
 
-use crate::log_storage::LogStorage;
+use crate::{
+    log_storage::{LogStoragePointer, Notifier},
+    shared,
+};
 
-#[derive(Default, Debug, Clone, Copy)]
-pub(crate) struct ClusterState {
-    pub(crate) _asd: u64,
+pub(crate) const NEW_LOG_MESSAGE_TYPE: u8 = 1;
+
+#[derive(Debug, Clone)]
+pub(crate) enum Message {
+    NewLog(Arc<Box<[u8]>>),
 }
 
-pub(crate) type ClusterStateReader = tokio::sync::broadcast::Receiver<ClusterState>;
-pub(crate) type ClusterStateTransmitter = tokio::sync::broadcast::Sender<ClusterState>;
+pub(crate) type Transmitter = tokio::sync::broadcast::Sender<Message>;
+pub(crate) type Reader = tokio::sync::broadcast::Receiver<Message>;
 
 pub(crate) struct Cluster {
-    cst: ClusterStateTransmitter, // cluster state transmitter
+    cst: Transmitter, // cluster state transmitter
     // We need to store it in order to not close transmitter channel.
-    _csr: ClusterStateReader,
+    _csr: Reader,
 }
 
 impl Cluster {
-    pub(crate) fn new() -> (Self, ClusterStateTransmitter) {
+    pub(crate) fn new() -> (Self, Transmitter) {
         let (tx, rx) = tokio::sync::broadcast::channel(100);
         (
             Self {
@@ -39,7 +42,8 @@ impl Cluster {
     pub(crate) async fn start(
         &self,
         addrs: String,
-        log_storage: Arc<Mutex<LogStorage>>,
+        log_storage: LogStoragePointer,
+        mut lsn: Notifier,
         mut shutdown_rx: tokio::sync::watch::Receiver<()>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         self.connect(&addrs, log_storage).await?;
@@ -49,43 +53,22 @@ impl Cluster {
         }
         loop {
             tokio::select! {
+                new_log = lsn.recv() => {
+                    let new_log = new_log?;
+                    shared::broadcast(&self.cst, Message::NewLog(new_log))?;
+                }
                 _ = shutdown_rx.changed() => {
                     debug!("received shutdown signal; stop routine");
                     return Ok(());
-                }
-                res = self.tick() => {
-                    match res {
-                        Ok(_) => (),
-                        Err(e) => match e {
-                            Error::TransmitClusterStateError(e) => {
-                                error!(?e, "failed to transmit cluster state")
-                            }
-                        }
-                    }
                 }
             }
         }
     }
 
-    async fn tick(&self) -> Result<(), Error> {
-        // We compare with "1" because 1 is a default receiver in server struct.
-        // For each connection it is incrementing by 1, so 1 connection = 2 receivers.
-        if self.cst.receiver_count() == 1 {
-            trace!("there are no receivers to transmit state");
-            tokio::time::sleep(Duration::from_secs(3)).await;
-            return Ok(());
-        }
-        self.cst
-            .send(ClusterState::default())
-            .map_err(|e| Error::TransmitClusterStateError(e.to_string()))?;
-        tokio::time::sleep(Duration::from_secs(1)).await;
-        Ok(())
-    }
-
     async fn connect(
         &self,
         addrs: &str,
-        log_storage: Arc<Mutex<LogStorage>>,
+        log_storage: LogStoragePointer,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let addrs = addrs.split(',');
         for addr in addrs {
@@ -108,28 +91,25 @@ impl Cluster {
 
 async fn listen(
     mut stream: TcpStream,
-    log_storage: Arc<Mutex<LogStorage>>,
+    log_storage: LogStoragePointer,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Notify TCP server that it is cluster connection.
     stream.write_all(b"cluster>").await?;
     let mut reader = BufReader::new(stream);
     loop {
-        {
-            let mut buf: String = String::new();
-            reader.read_line(&mut buf).await?;
-            if buf.is_empty() {
-                break;
-            }
-            // Delete new line.
-            buf.pop();
-            log_storage.lock().await.store(buf.as_bytes()).await?;
+        let mut buf: Vec<u8> = Vec::new();
+        reader.read_until(10, &mut buf).await?;
+        if buf.is_empty() {
+            break;
+        }
+        // Get and remove message type.
+        let message_type = buf.remove(0);
+        // Delete new line.
+        buf.pop();
+        match message_type {
+            NEW_LOG_MESSAGE_TYPE => log_storage.lock().await.store(&buf).await?,
+            _ => error!("unknown first byte on cluster message: {}", buf[0]),
         }
     }
     Ok(())
-}
-
-#[derive(Error, Debug)]
-pub(crate) enum Error {
-    #[error("failed to transmit cluster state: {0}")]
-    TransmitClusterStateError(String),
 }

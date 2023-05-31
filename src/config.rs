@@ -8,7 +8,6 @@ const ENV_CLUSTER_ADDRS: &str = "CLUSTER_ADDRS";
 const DEFAULT_SOCKET_ADDR: &str = "127.0.0.1:6669";
 const DEFAULT_INDEX_NAME: &str = "nonsense";
 const DEFAULT_STORAGE_NAME: &str = "in_memory";
-const DEFAULT_CLUSTER_ADDRS: &str = "127.0.0.1:7771,127.0.0.1:7772";
 
 pub(crate) struct Config {
     pub(crate) socket_addr: String,
@@ -25,8 +24,7 @@ impl Config {
             env::var(ENV_INDEX_NAME).unwrap_or_else(|_| DEFAULT_INDEX_NAME.to_string());
         let storage_name =
             env::var(ENV_STORAGE_NAME).unwrap_or_else(|_| DEFAULT_STORAGE_NAME.to_string());
-        let cluster_addrs =
-            env::var(ENV_CLUSTER_ADDRS).unwrap_or_else(|_| DEFAULT_CLUSTER_ADDRS.to_string());
+        let cluster_addrs = env::var(ENV_CLUSTER_ADDRS).unwrap_or_default();
         Self {
             socket_addr,
             index_name,
