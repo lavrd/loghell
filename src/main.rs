@@ -92,7 +92,7 @@ async fn main() -> Result<std::process::ExitCode, Box<dyn std::error::Error>> {
     tokio::signal::ctrl_c().await?;
     info!("ctrl+c signal has been received");
 
-    trace!("server open connections : {}", connection_counter.load(Ordering::Relaxed));
+    trace!("server open connections: {}", connection_counter.load(Ordering::Relaxed));
     shutdown_tx.send(())?;
     let timeout = tokio::time::sleep(tokio::time::Duration::from_secs(10));
     tokio::pin!(timeout);

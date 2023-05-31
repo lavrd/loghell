@@ -22,7 +22,7 @@ pub(crate) struct Server {
     dashboard_content: String,
     connection_counter: Arc<AtomicU64>,
     log_storage: LogStoragePointer,
-    csr: cluster::ClusterStateReader,
+    csr: cluster::ClusterStateTransmitter,
 }
 
 impl Server {
@@ -30,7 +30,7 @@ impl Server {
         dashboard_content: String,
         connection_counter: Arc<AtomicU64>,
         log_storage: LogStoragePointer,
-        csr: cluster::ClusterStateReader,
+        csr: cluster::ClusterStateTransmitter,
     ) -> Self {
         Server {
             dashboard_content,
@@ -70,7 +70,7 @@ impl Server {
     ) -> Result<(), Box<dyn std::error::Error>> {
         loop {
             let (socket, socket_addr) = listener.accept().await?;
-            info!("new client; ip : {}", socket_addr);
+            info!("new client; ip: {}", socket_addr);
             self.connection_counter.fetch_add(1, Ordering::Relaxed);
 
             let mut connection = Connection::new(
@@ -80,7 +80,7 @@ impl Server {
                 self.dashboard_content.clone(),
                 self.connection_counter.clone(),
                 self.log_storage.clone(),
-                self.csr.clone(),
+                self.csr.subscribe(),
             );
             tokio::spawn(async move {
                 trace!("spawn thread for {} client", socket_addr);
@@ -134,11 +134,11 @@ impl Connection {
             res = self.read_data() => {
                 match res {
                     Ok(()) => debug!("connection with {} client closed successfully", self.socket_addr),
-                    Err(e) => error!("failed to read data from socket; client : {}; : {}", self.socket_addr, e)
+                    Err(e) => error!("failed to read data from socket; client: {}: {}", self.socket_addr, e)
                 }
             }
             _ = shutdown_rx_.changed() => {
-                trace!("terminating read data loop; client : {}", self.socket_addr);
+                trace!("terminating read data loop; client: {}", self.socket_addr);
             }
         }
 
@@ -146,10 +146,10 @@ impl Connection {
             Ok(()) => trace!("successfully shutdown {} socket", self.socket_addr),
             Err(e) => match e.kind() {
                 std::io::ErrorKind::NotConnected => debug!(
-                    "cannot shutdown {} socket because it is already disconnected : {}",
+                    "cannot shutdown {} socket because it is already disconnected: {}",
                     self.socket_addr, e
                 ),
-                _ => error!("failed to shutdown socket with {} address : {}", self.socket_addr, e),
+                _ => error!("failed to shutdown socket with {} address: {}", self.socket_addr, e),
             },
         }
 
@@ -267,7 +267,7 @@ Cache-Control: no-cache";
         tokio::select! {
             res = self.send_sse_data() => { res },
             _ = shutdown_rx_.changed() => {
-                trace!("terminating sse send data loop; client : {}", self.socket_addr);
+                trace!("terminating sse send data loop; client: {}", self.socket_addr);
                 Ok(())
             }
         }
@@ -280,26 +280,19 @@ Cache-Control: no-cache";
             start_from = now_as_nanos_u64()?;
             // We need to send at leat one message at time to check that connection is still open.
             logs.push(b"check".to_vec());
-            for mut log in logs {
+            for log in &mut logs {
                 log.push(10); // add new line
-                match self.socket.write_all(&log).await {
-                    Ok(()) => Ok(()),
-                    Err(e) => match e.kind() {
-                        std::io::ErrorKind::BrokenPipe => {
-                            debug!(
-                                "cannot send sse data; looks like {} client has disconnected",
-                                self.socket_addr
-                            );
-                            return Ok(());
-                        }
-                        _ => Err(e),
-                    },
-                }?;
+                let is_stop = write(&mut self.socket, &self.socket_addr, log).await?;
+                if is_stop {
+                    return Ok(());
+                }
             }
             self.socket.flush().await?;
             trace!("sent sse (logs) data to {} client", self.socket_addr);
-            // todo: sleep 1s only if there are no logs
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            // It means we sent only check command.
+            if logs.len() == 1 {
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            }
         }
     }
 
@@ -312,27 +305,31 @@ Connection: close\n\n";
     }
 
     async fn handle_cluster(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        // todo: how to stop this loop?
-        // todo: how to use cluster state var from channel?
         loop {
-            tokio::select! {
-                _ = self.csr.changed() => {}
+            let _data = self.csr.recv().await?;
+            let is_stop = write(&mut self.socket, &self.socket_addr, b"asd\n").await?;
+            if is_stop {
+                return Ok(());
             }
-            // todo: we already have such logic in this module, reuse it
-            match self.socket.write_all(b"asd").await {
-                Ok(()) => Ok(()),
-                Err(e) => match e.kind() {
-                    std::io::ErrorKind::BrokenPipe => {
-                        debug!(
-                            "cannot send sse data; looks like {} client has disconnected",
-                            self.socket_addr
-                        );
-                        return Ok(());
-                    }
-                    _ => Err(e),
-                },
-            }?;
         }
+    }
+}
+
+/// If function returns true -> we need to stop read/write loop.
+async fn write(
+    socket: &mut TcpStream,
+    socket_addr: &SocketAddr,
+    data: &[u8],
+) -> Result<bool, Box<dyn std::error::Error>> {
+    match socket.write_all(data).await {
+        Ok(()) => Ok(false),
+        Err(e) => match e.kind() {
+            std::io::ErrorKind::BrokenPipe => {
+                debug!("cannot send data; looks like {} client disconnected", socket_addr);
+                Ok(true)
+            }
+            _ => Err(e.to_string().into()),
+        },
     }
 }
 

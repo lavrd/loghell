@@ -7,22 +7,30 @@ use tokio::{
 };
 use tracing::{debug, error, trace};
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone, Copy)]
 pub(crate) struct ClusterState {
     pub(crate) _asd: u64,
 }
 
-pub(crate) type ClusterStateReader = tokio::sync::watch::Receiver<ClusterState>;
-pub(crate) type ClusterStateTransmitter = tokio::sync::watch::Sender<ClusterState>;
+pub(crate) type ClusterStateReader = tokio::sync::broadcast::Receiver<ClusterState>;
+pub(crate) type ClusterStateTransmitter = tokio::sync::broadcast::Sender<ClusterState>;
 
 pub(crate) struct Cluster {
     cst: ClusterStateTransmitter, // cluster state transmitter
+    // We need to store it in order to not close transmitter channel.
+    _csr: ClusterStateReader,
 }
 
 impl Cluster {
-    pub(crate) fn new() -> (Self, ClusterStateReader) {
-        let (tx, rx) = tokio::sync::watch::channel(ClusterState::default());
-        (Self { cst: tx }, rx)
+    pub(crate) fn new() -> (Self, ClusterStateTransmitter) {
+        let (tx, rx) = tokio::sync::broadcast::channel(100);
+        (
+            Self {
+                cst: tx.clone(),
+                _csr: rx,
+            },
+            tx,
+        )
     }
 
     pub(crate) async fn start(
@@ -60,6 +68,8 @@ impl Cluster {
         // For each connection it is incrementing by 1, so 1 connection = 2 receivers.
         if self.cst.receiver_count() == 1 {
             trace!("there are no receivers to transmit state");
+            tokio::time::sleep(Duration::from_secs(3)).await;
+            return Ok(());
         }
         self.cst
             .send(ClusterState::default())
@@ -88,11 +98,11 @@ impl Cluster {
 }
 
 async fn listen(mut stream: TcpStream) -> Result<(), Box<dyn std::error::Error>> {
+    // Notify TCP server that it is cluster connection.
     stream.write_all(b"cluster>").await?;
     let remote_addr = stream.peer_addr()?;
     let mut reader = BufReader::new(stream);
     loop {
-        // todo: i have the same source code in loghellctl
         {
             let mut buf: String = String::new();
             reader.read_line(&mut buf).await?;
