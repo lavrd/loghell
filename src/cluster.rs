@@ -1,11 +1,14 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use thiserror::Error;
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::TcpStream,
+    sync::Mutex,
 };
 use tracing::{debug, error, trace};
+
+use crate::log_storage::LogStorage;
 
 #[derive(Default, Debug, Clone, Copy)]
 pub(crate) struct ClusterState {
@@ -36,9 +39,10 @@ impl Cluster {
     pub(crate) async fn start(
         &self,
         addrs: String,
+        log_storage: Arc<Mutex<LogStorage>>,
         mut shutdown_rx: tokio::sync::watch::Receiver<()>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        self.connect(&addrs).await?;
+        self.connect(&addrs, log_storage).await?;
         // At the moment we don't want to implement dynamic cluster changing.
         if !addrs.is_empty() {
             return Ok(());
@@ -78,7 +82,11 @@ impl Cluster {
         Ok(())
     }
 
-    async fn connect(&self, addrs: &str) -> Result<(), Box<dyn std::error::Error>> {
+    async fn connect(
+        &self,
+        addrs: &str,
+        log_storage: Arc<Mutex<LogStorage>>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let addrs = addrs.split(',');
         for addr in addrs {
             if addr.is_empty() {
@@ -86,8 +94,9 @@ impl Cluster {
             }
             let addr = addr.to_string();
             let stream = TcpStream::connect(&addr).await?;
+            let log_storage_ = log_storage.clone();
             tokio::spawn(async move {
-                match listen(stream).await {
+                match listen(stream, log_storage_).await {
                     Ok(_) => debug!(?addr, "connection stopped"),
                     Err(e) => error!(?e, "failed to listen stream"),
                 }
@@ -97,10 +106,12 @@ impl Cluster {
     }
 }
 
-async fn listen(mut stream: TcpStream) -> Result<(), Box<dyn std::error::Error>> {
+async fn listen(
+    mut stream: TcpStream,
+    log_storage: Arc<Mutex<LogStorage>>,
+) -> Result<(), Box<dyn std::error::Error>> {
     // Notify TCP server that it is cluster connection.
     stream.write_all(b"cluster>").await?;
-    let remote_addr = stream.peer_addr()?;
     let mut reader = BufReader::new(stream);
     loop {
         {
@@ -111,7 +122,7 @@ async fn listen(mut stream: TcpStream) -> Result<(), Box<dyn std::error::Error>>
             }
             // Delete new line.
             buf.pop();
-            eprintln!("new message in a cluster from {} - {}", remote_addr, buf);
+            log_storage.lock().await.store(buf.as_bytes()).await?;
         }
     }
     Ok(())

@@ -52,7 +52,7 @@ async fn main() -> Result<std::process::ExitCode, Box<dyn std::error::Error>> {
     let server = server::Server::new(
         dashboard_content.to_string(),
         connection_counter.clone(),
-        log_storage,
+        log_storage.clone(),
         csr,
     );
     let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(());
@@ -76,7 +76,7 @@ async fn main() -> Result<std::process::ExitCode, Box<dyn std::error::Error>> {
     handlers.push(res);
 
     let res: JoinHandle<ExitCode> = tokio::spawn(async move {
-        match cluster.start(cfg.cluster_addrs, shutdown_rx).await {
+        match cluster.start(cfg.cluster_addrs, log_storage, shutdown_rx).await {
             Ok(()) => {
                 debug!("cluster has been stopped successfully");
                 ExitCode::Ok
