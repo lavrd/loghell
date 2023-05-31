@@ -2,6 +2,7 @@ use std::net::SocketAddr;
 use std::str::from_utf8;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::vec;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
@@ -158,7 +159,7 @@ impl Connection {
 
     async fn read_data(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         loop {
-            let mut buf = [0; 1024];
+            let mut buf: Vec<u8> = vec![0; 1024];
             // Read data from socket.
             let n = match self.socket.read(&mut buf).await {
                 Ok(n) => {
@@ -170,7 +171,7 @@ impl Connection {
                     return Err(e.to_string().into());
                 }
             };
-            match self.process_data(n, &buf).await {
+            match self.process_data(n, buf).await {
                 Ok(ProcessDataResult::Ok) => {
                     trace!("data from {} client successfully proceeded", self.socket_addr);
                     // Read next frame from socket.
@@ -192,7 +193,7 @@ impl Connection {
     async fn process_data(
         &mut self,
         n: usize,
-        buf: &[u8],
+        buf: Vec<u8>,
     ) -> Result<ProcessDataResult, Box<dyn std::error::Error>> {
         match n {
             n if n == 0 => {
@@ -236,18 +237,18 @@ impl Connection {
         Ok(())
     }
 
-    async fn handle_log(&self, buf: &[u8], n: usize) -> Result<(), Box<dyn std::error::Error>> {
-        let mut truncated_buf = &buf[0..n];
+    async fn handle_log(
+        &self,
+        mut buf: Vec<u8>,
+        n: usize,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        buf.truncate(n);
         // Remove \n at the end of the data.
-        if truncated_buf.ends_with(&[10]) {
-            truncated_buf = &truncated_buf[0..n - 1]
+        if buf.ends_with(&[10]) {
+            buf.pop();
         }
-        info!(
-            "new data received from {} client : {:?}",
-            self.socket_addr,
-            from_utf8(truncated_buf)?
-        );
-        self.log_storage.lock().await.store(truncated_buf).await
+        info!("new data received from {} client: {:?}", self.socket_addr, from_utf8(&buf)?);
+        self.log_storage.lock().await.store(buf).await
     }
 
     async fn handle_sse(&mut self) -> Result<(), Box<dyn std::error::Error>> {

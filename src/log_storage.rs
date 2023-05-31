@@ -7,8 +7,8 @@ use crate::{index, shared, storage};
 pub(crate) type Key = u64;
 pub(crate) type Skip = u64;
 
-pub(crate) type Transmitter = tokio::sync::broadcast::Sender<Arc<Box<[u8]>>>;
-pub(crate) type Notifier = tokio::sync::broadcast::Receiver<Arc<Box<[u8]>>>;
+pub(crate) type Transmitter = tokio::sync::broadcast::Sender<Arc<Vec<u8>>>;
+pub(crate) type Notifier = tokio::sync::broadcast::Receiver<Arc<Vec<u8>>>;
 
 pub(crate) type LogStoragePointer = Arc<Mutex<LogStorage>>;
 
@@ -38,12 +38,12 @@ impl LogStorage {
         Ok((log_storage, tx))
     }
 
-    pub(crate) async fn store(&mut self, data: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+    pub(crate) async fn store(&mut self, data: Vec<u8>) -> Result<(), Box<dyn std::error::Error>> {
         async move {
             let key: Key = fastrand::u64(..);
-            self.storage.write(key, data)?;
-            self.index.index(key, data)?;
-            shared::broadcast(&self.lst, Arc::new(data.to_vec().into_boxed_slice()))?;
+            self.storage.write(key, &data)?;
+            self.index.index(key, &data)?;
+            shared::broadcast(&self.lst, Arc::new(data))?;
             Ok(())
         }
         .await

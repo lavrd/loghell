@@ -15,7 +15,7 @@ pub(crate) const NEW_LOG_MESSAGE_TYPE: u8 = 1;
 
 #[derive(Debug, Clone)]
 pub(crate) enum Message {
-    NewLog(Arc<Box<[u8]>>),
+    NewLog(Arc<Vec<u8>>),
 }
 
 pub(crate) type Transmitter = tokio::sync::broadcast::Sender<Message>;
@@ -107,7 +107,7 @@ async fn listen(
         // Delete new line.
         buf.pop();
         match message_type {
-            NEW_LOG_MESSAGE_TYPE => log_storage.lock().await.store(&buf).await?,
+            NEW_LOG_MESSAGE_TYPE => log_storage.lock().await.store(buf).await?,
             _ => error!("unknown first byte on cluster message: {}", buf[0]),
         }
     }
