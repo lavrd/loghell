@@ -8,7 +8,7 @@ use tracing::{debug, error};
 
 use crate::{
     log_storage::{LogStoragePointer, Notifier},
-    shared,
+    server, shared,
 };
 
 pub(crate) const NEW_LOG_MESSAGE_TYPE: u8 = 1;
@@ -94,7 +94,7 @@ async fn listen(
     log_storage: LogStoragePointer,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Notify TCP server that it is cluster connection.
-    stream.write_all(b"cluster>").await?;
+    stream.write_all(server::CMD_CLUSTER.as_bytes()).await?;
     let mut reader = BufReader::new(stream);
     loop {
         let mut buf: Vec<u8> = Vec::new();

@@ -2,8 +2,9 @@ use std::net::SocketAddr;
 use std::str::from_utf8;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use std::vec;
+use std::{io, vec};
 
+use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::watch;
@@ -13,6 +14,9 @@ use crate::cluster::Message;
 use crate::cluster::{self, NEW_LOG_MESSAGE_TYPE};
 use crate::log_storage::LogStoragePointer;
 use crate::shared::now_as_nanos_u64;
+
+pub const CMD_CLUSTER: &str = "cluster>";
+pub const CMD_CHECK: &str = "check>";
 
 enum ProcessDataResult {
     Ok,
@@ -182,19 +186,21 @@ impl Connection {
                     // Go away from read loop to close connection with client.
                     return Ok(());
                 }
-                Err(e) => {
-                    error!("failed to process data from {} client: {}", self.socket_addr, e);
-                    return Err(e.to_string().into());
-                }
+                Err(e) => match e {
+                    Error::Disconnected(e) => {
+                        debug!("looks like {} client disconnected: {}", &self.socket_addr, e);
+                        return Ok(());
+                    }
+                    _ => {
+                        error!("failed to process data from {} client: {}", self.socket_addr, e);
+                        return Err(e.to_string().into());
+                    }
+                },
             };
         }
     }
 
-    async fn process_data(
-        &mut self,
-        n: usize,
-        buf: Vec<u8>,
-    ) -> Result<ProcessDataResult, Box<dyn std::error::Error>> {
+    async fn process_data(&mut self, n: usize, buf: Vec<u8>) -> Result<ProcessDataResult, Error> {
         match n {
             n if n == 0 => {
                 trace!("connection with {} client closed", self.socket_addr);
@@ -217,7 +223,7 @@ impl Connection {
                 if buf.starts_with(b"GET /health HTTP/1.1") {
                     return self.handle_health().await.map(|_| Ok(ProcessDataResult::Close))?;
                 }
-                if buf.starts_with(b"cluster>") {
+                if buf.starts_with(CMD_CLUSTER.as_bytes()) {
                     return self.handle_cluster().await.map(|_| Ok(ProcessDataResult::Close))?;
                 }
                 self.handle_log(buf, n).await.map(|_| Ok(ProcessDataResult::Ok))?
@@ -225,45 +231,39 @@ impl Connection {
         }
     }
 
-    async fn handle_dashboard(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn handle_dashboard(&mut self) -> Result<(), Error> {
         let response = format!(
             "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}",
             self.dashboard_content.len(),
             self.dashboard_content
         );
-        self.socket.write_all(response.as_bytes()).await?;
-        self.socket.flush().await?;
+        write(&mut self.socket, response.as_bytes(), true).await?;
         info!("sent dashboard for {} client", self.socket_addr);
         Ok(())
     }
 
-    async fn handle_log(
-        &self,
-        mut buf: Vec<u8>,
-        n: usize,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    async fn handle_log(&self, mut buf: Vec<u8>, n: usize) -> Result<(), Error> {
         buf.truncate(n);
         // Remove \n at the end of the data.
         if buf.ends_with(&[10]) {
             buf.pop();
         }
-        info!("new data received from {} client: {:?}", self.socket_addr, from_utf8(&buf)?);
-        self.log_storage.lock().await.store(buf).await
+        info!(
+            "new data received from {} client: {:?}",
+            self.socket_addr,
+            from_utf8(&buf).map_err(map_err)?
+        );
+        self.log_storage.lock().await.store(buf).await.map_err(map_err)
     }
 
-    async fn handle_sse(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn handle_sse(&mut self) -> Result<(), Error> {
         let response = "HTTP/1.1 200 OK
 Connection: keep-alive
 Content-Type: text/event-stream
 Cache-Control: no-cache";
-        self.socket.write_all(response.as_bytes()).await?;
-        self.socket.flush().await?;
-
-        self.socket.write_all(b"retry: 10000\n").await?;
-        self.socket.flush().await?;
-        self.socket.write_all(b"event: data\n").await?;
-        self.socket.flush().await?;
-
+        write(&mut self.socket, response.as_bytes(), false).await?;
+        write(&mut self.socket, b"retry: 10000\n", false).await?;
+        write(&mut self.socket, b"event: data\n", true).await?;
         let mut shutdown_rx_ = self.shutdown_rx.clone();
         tokio::select! {
             res = self.send_sse_data() => { res },
@@ -274,21 +274,25 @@ Cache-Control: no-cache";
         }
     }
 
-    async fn send_sse_data(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn send_sse_data(&mut self) -> Result<(), Error> {
         let mut start_from = 0;
         loop {
-            let mut logs = self.log_storage.lock().await.find("level:debug", start_from).await?;
-            start_from = now_as_nanos_u64()?;
+            // todo: get "level:debug" from request
+            let mut logs = self
+                .log_storage
+                .lock()
+                .await
+                .find("level:debug", start_from)
+                .await
+                .map_err(map_err)?;
+            start_from = now_as_nanos_u64().map_err(map_err)?;
             // We need to send at leat one message at time to check that connection is still open.
-            logs.push(b"check".to_vec());
+            logs.push(CMD_CHECK.as_bytes().to_vec());
             for log in &mut logs {
                 log.push(10); // add new line
-                let is_stop = write(&mut self.socket, &self.socket_addr, log).await?;
-                if is_stop {
-                    return Ok(());
-                }
+                write(&mut self.socket, log, false).await?;
             }
-            self.socket.flush().await?;
+            write(&mut self.socket, &[], true).await?;
             trace!("sent sse (logs) data to {} client", self.socket_addr);
             // It means we sent only check command.
             if logs.len() == 1 {
@@ -297,20 +301,18 @@ Cache-Control: no-cache";
         }
     }
 
-    async fn handle_health(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn handle_health(&mut self) -> Result<(), Error> {
         let response = "HTTP/1.1 200 OK
 Connection: close\n\n";
-        self.socket.write_all(response.as_bytes()).await?;
-        self.socket.flush().await?;
-        Ok(())
+        write(&mut self.socket, response.as_bytes(), true).await
     }
 
-    async fn handle_cluster(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn handle_cluster(&mut self) -> Result<(), Error> {
         // As we want to add meta data to our message when transmit it to other cluster members
         // we need to add two more bytes with it. It is message type and new line.
         const DATA_OVERHEAD_LENGTH: usize = 2;
         loop {
-            let msg = self.csr.recv().await?;
+            let msg = self.csr.recv().await.map_err(map_err)?;
             let data = match msg {
                 Message::NewLog(new_log) => {
                     let mut data: Vec<u8> =
@@ -321,30 +323,25 @@ Connection: close\n\n";
                     data
                 }
             };
-            let is_stop = write(&mut self.socket, &self.socket_addr, &data).await?;
-            if is_stop {
-                return Ok(());
-            }
+            write(&mut self.socket, &data, true).await?;
         }
     }
 }
 
-/// If function returns true -> we need to stop read/write loop.
-async fn write(
-    socket: &mut TcpStream,
-    socket_addr: &SocketAddr,
-    data: &[u8],
-) -> Result<bool, Box<dyn std::error::Error>> {
-    match socket.write_all(data).await {
-        Ok(()) => Ok(false),
-        Err(e) => match e.kind() {
-            std::io::ErrorKind::BrokenPipe => {
-                debug!("cannot send data; looks like {} client disconnected", socket_addr);
-                Ok(true)
-            }
-            _ => Err(e.to_string().into()),
-        },
+async fn write(socket: &mut TcpStream, data: &[u8], flush: bool) -> Result<(), Error> {
+    if !data.is_empty() {
+        match socket.write_all(data).await {
+            Ok(_) => (),
+            Err(e) => match e.kind() {
+                std::io::ErrorKind::BrokenPipe => return Err(Error::Disconnected(e.to_string())),
+                _ => return Err(e.into()),
+            },
+        };
     }
+    if flush {
+        socket.flush().await?;
+    }
+    Ok(())
 }
 
 impl Drop for Connection {
@@ -354,4 +351,18 @@ impl Drop for Connection {
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |x| Some(x - 1))
             .unwrap();
     }
+}
+
+#[derive(Error, Debug)]
+enum Error {
+    #[error("cannot send data; looks like {0} client disconnected")]
+    Disconnected(String),
+    #[error("io error")]
+    IO(#[from] io::Error),
+    #[error("internal error: {0}")]
+    Internal(String),
+}
+
+fn map_err<T: ToString>(err: T) -> Error {
+    Error::Internal(err.to_string())
 }
